@@ -1064,3 +1064,25 @@ void Solver::garbageCollect()
                ca.size()*ClauseAllocator::Unit_Size, to.size()*ClauseAllocator::Unit_Size);
     to.moveTo(ca);
 }
+
+
+/*===== IPASIR-UP BEGIN ==================================================*/
+
+void Solver::connect_external_propagator (ExternalPropagator *propagator) {
+    this->propagator = propagator;
+}
+
+void Solver::disconnect_external_propagator () {
+    this->propagator = nullptr;
+}
+
+void Solver::add_observed_var (int idx) {
+}
+
+void Solver::remove_observed_var (int idx) {
+}
+
+void Solver::reset_observed_vars () {
+}
+
+/*===== IPASIR-UP END ====================================================*/
