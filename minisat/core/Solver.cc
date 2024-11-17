@@ -1060,6 +1060,86 @@ void Solver::garbageCollect()
 
 /*===== IPASIR-UP BEGIN ==================================================*/
 
+int Solver::calculate_lit_sort_index(Lit lit) {
+    return value(var(lit)) == l_Undef ? 0 :
+                sign(lit) ? (INT_MAX - level(lit)) : (INT_MIN + level(lit));
+}
+
+void Solver::sort_clause_solving(vec<Lit>& ps) {
+    sort(ps, [this](Lit a, Lit b) {
+        return calculate_lit_sort_index(a) < calculate_lit_sort_index(b);
+    });
+}
+
+void Solver::add_clause_solving(vec<Lit>& ps) {
+    // empty clause
+    if (ps.size() == 0) {
+        // --> UNSAT
+    }
+
+    int i, j;
+
+    // sort by literal to find tautology
+    sort(ps);
+    for (i = 0; i < ps.size() - 1; i++) {
+        if (ps[i] == ~ps[i+1]) {
+            // --> skip this clause
+        }
+    }
+
+    // sort by level and assignment
+    // true(low level - high level) - unassigned - false(high level - low level)
+    sort_clause_solving(ps);
+
+    // remove 0-false literals
+    for (i = ps.size() - 1; i >= 0; --i) {
+        if (value(ps[i]) != l_False || level(ps[i]) != 0) {
+            break;
+        }
+    }
+    ps.shrink(ps.size() - 1 - i);
+
+    // empty
+    if (ps.size() == 0) {
+        // --> UNSAT
+    }
+
+    // contains 0-true literals
+    if (value(ps[0]) == l_True && level(ps[0]) == 0) {
+        // --> skip this clause
+    }
+
+    // unit
+    if (ps.size() == 1) {
+        // backtrack to level 0
+        cancelUntil(0);
+        uncheckedEnqueue(ps[0]);
+
+        // --> propagate
+    }
+
+    CRef cr = ca.alloc(ps, false);
+    clauses.push(cr);
+    attachClause(cr);
+
+    Lit a = ps[0], b = ps[1];
+    if (value(a) != l_False) {
+        // Not Implemented
+    }
+    
+    if (level(a) == level(b)) {
+        cancelUntil(level(a));
+
+        // --> analyze conflict
+    } else {
+        assert(level(a) > level(b));
+        cancelUntil(level(b));
+        uncheckedEnqueue(a, cr);
+
+        // --> propagate
+    }
+}
+
 void Solver::connect_external_propagator (ExternalPropagator *external_propagator) {
     this->external_propagator = external_propagator;
 }

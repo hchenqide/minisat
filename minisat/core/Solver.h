@@ -284,6 +284,7 @@ protected:
     uint32_t abstractLevel    (Var x) const; // Used to represent an abstraction of sets of decision levels.
     CRef     reason           (Var x) const;
     int      level            (Var x) const;
+    int      level            (Lit l) const;
     double   progressEstimate ()      const; // DELETE THIS ?? IT'S NOT VERY USEFUL ...
     bool     withinBudget     ()      const;
     void     relocAll         (ClauseAllocator& to);
@@ -304,20 +305,28 @@ protected:
 
 
     // ====== BEGIN IPASIR-UP ================================================
+private:
+    int calculate_lit_sort_index(Lit lit);
+    void sort_clause_solving(vec<Lit>& ps);
+    void add_clause_solving(vec<Lit>& ps);
+
 protected:
     ExternalPropagator *external_propagator;
-/*
-private:
-    void notify_assignment(const std::vector<int>& lits) {}
-    void notify_new_decision_level() {}
-    void notify_backtrack(size_t new_level) {}
-    bool cb_check_found_model(const std::vector<int>& model) {}
-    int cb_decide() {}
-    int cb_propagate() {}
-    int cb_add_reason_clause_lit(int propagated_lit) {}
-    bool cb_has_external_clause(bool& is_forgettable) {}
-    int cb_add_external_clause_lit() {}
-*/
+
+protected:
+    void add_external_clause();
+    /*
+    private:
+        void notify_assignment(const std::vector<int>& lits) {}
+        void notify_new_decision_level() {}
+        void notify_backtrack(size_t new_level) {}
+        bool cb_check_found_model(const std::vector<int>& model) {}
+        int cb_decide() {}
+        int cb_propagate() {}
+        int cb_add_reason_clause_lit(int propagated_lit) {}
+        bool cb_has_external_clause(bool& is_forgettable) {}
+        int cb_add_external_clause_lit() {}
+    */
 public:
     // Add call-back which allows to learn, propagate and backtrack based on
     // external constraints. Only one external propagator can be connected
@@ -497,6 +506,7 @@ inline CRef Solver::reason(Var x) const {
     return vardata[x].reason;
 }
 inline int  Solver::level (Var x) const { return vardata[x].level; }
+inline int  Solver::level (Lit l) const { return level(var(l)); }
 
 inline void Solver::insertVarOrder(Var x) {
     if (!order_heap.inHeap(x) && decision[x]) order_heap.insert(x); }
