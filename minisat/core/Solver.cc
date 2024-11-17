@@ -239,7 +239,12 @@ void Solver::cancelUntil(int level) {
         qhead = trail_lim[level];
         trail.shrink(trail.size() - trail_lim[level]);
         trail_lim.shrink(trail_lim.size() - level);
-    } }
+
+        if (external_propagator) {
+            external_propagator->notify_backtrack(level);
+        }
+    }
+}
 
 
 //=================================================================================================
@@ -249,6 +254,16 @@ void Solver::cancelUntil(int level) {
 Lit Solver::pickBranchLit()
 {
     Var next = var_Undef;
+
+    if (external_propagator) {
+        int lit = external_propagator->cb_decide();
+        if (lit != 0) {
+            Lit l = mkLit(abs(lit), lit < 0);
+            if (value(lit) == l_Undef) {
+                return l;
+            }
+        }
+    }
 
     // Random decision:
     if (drand(random_seed) < random_var_freq && !order_heap.empty()){
@@ -489,6 +504,10 @@ void Solver::uncheckedEnqueue(Lit p, CRef from)
     assigns[var(p)] = lbool(!sign(p));
     vardata[var(p)] = mkVarData(from, decisionLevel());
     trail.push_(p);
+
+    if (external_propagator){
+        external_propagator->notify_assignment({toInt(p)});
+    }
 }
 
 
@@ -1041,12 +1060,12 @@ void Solver::garbageCollect()
 
 /*===== IPASIR-UP BEGIN ==================================================*/
 
-void Solver::connect_external_propagator (ExternalPropagator *propagator) {
-    this->propagator = propagator;
+void Solver::connect_external_propagator (ExternalPropagator *external_propagator) {
+    this->external_propagator = external_propagator;
 }
 
 void Solver::disconnect_external_propagator () {
-    this->propagator = nullptr;
+    this->external_propagator = nullptr;
 }
 
 void Solver::add_observed_var (int idx) {
