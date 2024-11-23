@@ -101,6 +101,8 @@ Solver::Solver() :
   , conflict_budget    (-1)
   , propagation_budget (-1)
   , asynch_interrupt   (false)
+
+  , external_propagator(nullptr)
 {}
 
 
@@ -258,7 +260,7 @@ Lit Solver::pickBranchLit()
     if (external_propagator) {
         int lit = external_propagator->cb_decide();
         if (lit != 0) {
-            Lit l = mkLit(abs(lit), lit < 0);
+            Lit l = intToLit(lit);
             if (value(lit) == l_Undef) {
                 return l;
             }
@@ -506,7 +508,7 @@ void Solver::uncheckedEnqueue(Lit p, CRef from)
     trail.push_(p);
 
     if (external_propagator){
-        external_propagator->notify_assignment({toInt(p)});
+        external_propagator->notify_assignment({LitToint(p)});
     }
 }
 
@@ -727,7 +729,9 @@ lbool Solver::search(int nof_conflicts)
     starts++;
 
     for (;;){
+    propagate:
         CRef confl = propagate();
+    analyze:
         if (confl != CRef_Undef){
             // CONFLICT
             conflicts++; conflictC++;
@@ -791,6 +795,28 @@ lbool Solver::search(int nof_conflicts)
                 }else{
                     next = p;
                     break;
+                }
+            }
+
+            if (external_propagator) {
+                bool is_forgettable;
+                while (external_propagator->cb_has_external_clause(is_forgettable)) {
+                    add_tmp.clear();
+                    int lit;
+                    while (lit = external_propagator->cb_add_external_clause_lit()){
+                        add_tmp.push(intToLit(lit));
+                    }
+                    bool prop = false;
+                    bool unsat = add_clause_solving(add_tmp, confl, prop);
+                    if (unsat) {
+                        return l_False;
+                    }
+                    if (prop) {
+                        goto propagate;
+                    }
+                    if (confl != CRef_Undef) {
+                        goto analyze;
+                    }
                 }
             }
 
@@ -1067,14 +1093,19 @@ int Solver::calculate_lit_sort_index(Lit lit) {
 
 void Solver::sort_clause_solving(vec<Lit>& ps) {
     sort(ps, [this](Lit a, Lit b) {
-        return calculate_lit_sort_index(a) < calculate_lit_sort_index(b);
+        int la = calculate_lit_sort_index(a), lb = calculate_lit_sort_index(b);
+        if (la == lb) {
+            return a < b;
+        } else{
+            return la < lb;
+        }
     });
 }
 
-void Solver::add_clause_solving(vec<Lit>& ps) {
+bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
     // empty clause
     if (ps.size() == 0) {
-        // --> UNSAT
+        return true;
     }
 
     int i, j;
@@ -1083,7 +1114,7 @@ void Solver::add_clause_solving(vec<Lit>& ps) {
     sort(ps);
     for (i = 0; i < ps.size() - 1; i++) {
         if (ps[i] == ~ps[i+1]) {
-            // --> skip this clause
+            return false;
         }
     }
 
@@ -1101,12 +1132,12 @@ void Solver::add_clause_solving(vec<Lit>& ps) {
 
     // empty
     if (ps.size() == 0) {
-        // --> UNSAT
+        return true;
     }
 
     // contains 0-true literals
     if (value(ps[0]) == l_True && level(ps[0]) == 0) {
-        // --> skip this clause
+        return false;
     }
 
     // unit
@@ -1114,8 +1145,8 @@ void Solver::add_clause_solving(vec<Lit>& ps) {
         // backtrack to level 0
         cancelUntil(0);
         uncheckedEnqueue(ps[0]);
-
-        // --> propagate
+        propagate = true;
+        return false;
     }
 
     CRef cr = ca.alloc(ps, false);
@@ -1123,21 +1154,25 @@ void Solver::add_clause_solving(vec<Lit>& ps) {
     attachClause(cr);
 
     Lit a = ps[0], b = ps[1];
-    if (value(a) != l_False) {
+    if (value(a) == l_False) {
+        if (level(a) == level(b)) {
+            cancelUntil(level(a));
+            conflict = cr;
+            return false;
+        } else {
+            assert(level(a) > level(b));
+            cancelUntil(level(b));
+            uncheckedEnqueue(a, cr);
+            propagate = true;
+            return false;
+        }
+    } else if (value(a) == l_Undef) {
+        // Not Implemented
+    } else {
+        assert(value(a) == l_True);
         // Not Implemented
     }
-    
-    if (level(a) == level(b)) {
-        cancelUntil(level(a));
-
-        // --> analyze conflict
-    } else {
-        assert(level(a) > level(b));
-        cancelUntil(level(b));
-        uncheckedEnqueue(a, cr);
-
-        // --> propagate
-    }
+    return false;
 }
 
 void Solver::connect_external_propagator (ExternalPropagator *external_propagator) {

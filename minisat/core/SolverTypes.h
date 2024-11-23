@@ -71,6 +71,10 @@ inline  int  toInt     (Var v)              { return v; }
 inline  int  toInt     (Lit p)              { return p.x; } 
 inline  Lit  toLit     (int i)              { Lit p; p.x = i; return p; } 
 
+// Mapping Literals from internal repersentation to cnf int representation
+inline  Lit  intToLit  (int i)              { assert(i != 0); return mkLit(abs(i) - 1, i < 0); }
+inline  int  LitToint  (Lit l)              { return sign(l) ? -(var(l) + 1) : (var(l) + 1); }
+
 //const Lit lit_Undef = mkLit(var_Undef, false);  // }- Useful special constants.
 //const Lit lit_Error = mkLit(var_Undef, true );  // }
 
