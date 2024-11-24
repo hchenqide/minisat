@@ -1087,8 +1087,8 @@ void Solver::garbageCollect()
 /*===== IPASIR-UP BEGIN ==================================================*/
 
 int Solver::calculate_lit_sort_index(Lit lit) {
-    return value(var(lit)) == l_Undef ? 0 :
-                sign(lit) ? (INT_MAX - level(lit)) : (INT_MIN + level(lit));
+    return value(lit) == l_Undef ? 0 : value(lit) == l_False ? (INT_MAX - level(lit))
+                                                             : (INT_MIN + level(lit));
 }
 
 void Solver::sort_clause_solving(vec<Lit>& ps) {
@@ -1167,10 +1167,22 @@ bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
             return false;
         }
     } else if (value(a) == l_Undef) {
-        // Not Implemented
+        if (value(b) == l_False) {
+            cancelUntil(level(b));
+            uncheckedEnqueue(a, cr);
+            propagate = true;
+            return false;
+        }
     } else {
         assert(value(a) == l_True);
-        // Not Implemented
+        if (value(b) == l_False) {
+            if (level(a) > level(b)){
+                cancelUntil(level(b));
+                uncheckedEnqueue(a, cr);
+                propagate = true;
+                return false;
+            }
+        }
     }
     return false;
 }

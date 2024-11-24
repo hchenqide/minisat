@@ -90,14 +90,13 @@ int main() {
 
     Solver s; s.varNum(3);
     s.addClause({
-        vi{1, 2},
-        vi{-1, 3},
+        vi{1, 2, 3},
     });
 
     Propagator p({
-        nop,            // 1: -1, 2
-        vi{1, -2},      // 0: 1, 3
-        vi{-1, -3, 2},  // 0: 1, 3, 2
+        nop,
+        nop,
+        vi{3, -2},
     });
     
     s.connect_external_propagator(&p);
