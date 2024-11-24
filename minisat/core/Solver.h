@@ -305,6 +305,21 @@ protected:
 
 
     // ====== BEGIN IPASIR-UP ================================================
+public:
+    struct IPASIRUPStats {
+        int unsat = 0;
+        int skipped = 0;
+        int unit = 0;
+        int ff_conf = 0;
+        int ff_prop = 0;
+        int uf = 0;
+        int uu = 0;
+        int tf_prop = 0;
+        int tf_unprop = 0;
+        int tu = 0;
+        int tt = 0;
+    } ipasirup_stats;
+
 private:
     int calculate_lit_sort_index(Lit lit);
     void sort_clause_solving(vec<Lit>& ps);

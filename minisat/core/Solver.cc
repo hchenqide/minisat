@@ -1105,19 +1105,28 @@ void Solver::sort_clause_solving(vec<Lit>& ps) {
 bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
     // empty clause
     if (ps.size() == 0) {
+        ipasirup_stats.unsat++;
         return true;
     }
 
     int i, j;
 
-    // sort by literal to find tautology
+    // sort by literal
     sort(ps);
+    // remove duplicate
+    j = i = 0;
+    while (++i < ps.size())
+        if (!(ps[j] == ps[i]) && ++j != i)
+            ps[j] = ps[i];
+    ps.shrink(i - j - 1);
+    // find tautology
     for (i = 0; i < ps.size() - 1; i++) {
         if (ps[i] == ~ps[i+1]) {
+            ipasirup_stats.skipped++;
             return false;
         }
     }
-
+    
     // sort by level and assignment
     // true(low level - high level) - unassigned - false(high level - low level)
     sort_clause_solving(ps);
@@ -1132,16 +1141,19 @@ bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
 
     // empty
     if (ps.size() == 0) {
+        ipasirup_stats.unsat++;
         return true;
     }
 
     // contains 0-true literals
     if (value(ps[0]) == l_True && level(ps[0]) == 0) {
+        ipasirup_stats.skipped++;
         return false;
     }
 
     // unit
     if (ps.size() == 1) {
+        ipasirup_stats.unit++;
         // backtrack to level 0
         cancelUntil(0);
         uncheckedEnqueue(ps[0]);
@@ -1155,12 +1167,16 @@ bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
 
     Lit a = ps[0], b = ps[1];
     if (value(a) == l_False) {
+        assert(value(b) == l_False);
+        assert(a < b);
         if (level(a) == level(b)) {
+            ipasirup_stats.ff_conf++;
             cancelUntil(level(a));
             conflict = cr;
             return false;
         } else {
             assert(level(a) > level(b));
+            ipasirup_stats.ff_prop++;
             cancelUntil(level(b));
             uncheckedEnqueue(a, cr);
             propagate = true;
@@ -1168,20 +1184,34 @@ bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
         }
     } else if (value(a) == l_Undef) {
         if (value(b) == l_False) {
+            ipasirup_stats.uf++;
             cancelUntil(level(b));
             uncheckedEnqueue(a, cr);
             propagate = true;
             return false;
+        } else {
+            assert(value(b) == l_Undef);
+            assert(a < b);
+            ipasirup_stats.uu++;
         }
     } else {
         assert(value(a) == l_True);
         if (value(b) == l_False) {
-            if (level(a) > level(b)){
+            if (level(a) > level(b)) {
+                ipasirup_stats.tf_prop++;
                 cancelUntil(level(b));
                 uncheckedEnqueue(a, cr);
                 propagate = true;
                 return false;
+            } else {
+                ipasirup_stats.tf_unprop++;
             }
+        } else if (value(b) == l_Undef) {
+            ipasirup_stats.tu++;
+        } else {
+            assert(value(b) == l_True);
+            assert(a < b);
+            ipasirup_stats.tt++;
         }
     }
     return false;
