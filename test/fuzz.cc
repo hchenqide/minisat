@@ -41,16 +41,20 @@ static std::vector<std::vector<int>> parse_DIMACS(B& in, int& max_var) {
         else {
             cnt++;
             clauses.push_back(readClause(in, max_var));
+            if (cnt >= clause_cnt) {
+                break;
+            }
         }
     }
     return clauses;
 }
 
-std::mt19937 gen(
-    12
-    //std::random_device{}()
-);
-static std::bernoulli_distribution bp(0.3);
+unsigned int seed =
+//12;
+std::random_device{}();
+
+std::mt19937 gen(seed);
+static std::bernoulli_distribution bp(0.2);
 
 std::pair<std::vector<std::vector<int>>, std::vector<std::vector<int>>>
 split_clauses(std::vector<std::vector<int>> clauses, float ratio) {
@@ -83,12 +87,12 @@ public:
 };
 
 class Propagator : public Minisat::ExternalPropagator {
-private:
+public:
     std::vector<std::vector<int>> clauses;
     std::vector<int> current;
     size_t current_index;
 
-private:
+public:
     std::vector<size_t> assignment_level;
     std::vector<int> assignments;
 
@@ -97,7 +101,7 @@ public:
         : clauses(clauses) {
     }
 
-private:
+public:
     virtual void notify_assignment(const std::vector<int>& lits) override {
         assignments.insert(assignments.end(), lits.begin(), lits.end());
     }
@@ -151,7 +155,7 @@ int main(int argc, char** argv) {
     gzclose(in);
 
     // split clauses
-    auto [initial, rest] = split_clauses(clauses, 0.3);
+    auto [initial, rest] = split_clauses(clauses, 0.1);
 
     Solver s;
     s.maxVar(max_var);
@@ -161,5 +165,8 @@ int main(int argc, char** argv) {
     s.connect_external_propagator(&p);
 
     bool res = s.solve();
+    seed;
+    p.clauses;
+    s.ipasirup_stats;
     return res;
 }
