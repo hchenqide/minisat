@@ -4,12 +4,30 @@
 #include <vector>
 #include <optional>
 
-using namespace Minisat;
+class Solver : public Minisat::Solver {
+public:
+    void varNum(size_t num) {
+        while (num--)
+            newVar();
+    }
+    void addClause(std::vector<int> c) {
+        add_tmp.clear();
+        add_tmp.capacity(c.size());
+        for (int l : c) {
+            add_tmp.push(Minisat::intToLit(l));
+        }
+        addClause_(add_tmp);
+    }
+    void addClause(std::vector<std::vector<int>> v) {
+        for(auto& c : v) {
+            addClause(std::move(c));
+        }
+    }
+};
 
-
-class Propagator : public ExternalPropagator {
+class Propagator : public Minisat::ExternalPropagator {
 private:
-    std::list<std::optional<std::list<std::vector<int>>>> command;
+    std::list<std::optional<std::vector<int>>> command;
     std::vector<int> current;
     size_t current_index;
 
@@ -18,7 +36,7 @@ private:
     std::vector<int> assignments;
 
 public:
-    Propagator(std::list<std::optional<std::list<std::vector<int>>>> command)
+    Propagator(std::list<std::optional<std::vector<int>>> command)
         : command(command) {
     }
 
@@ -45,19 +63,16 @@ private:
         if (command.empty()) {
             return false;
         }
-        if (!command.front().has_value()) {
-            command.pop_front();
-            return false;
-        }
-        if (command.front().value().empty()) {
-            command.pop_front();
+
+        auto front = std::move(command.front());
+        command.pop_front();
+        if (!front.has_value()) {
             return false;
         }
 
-        is_forgettable = true;
-        current = std::move(command.front().value().front());
+        current = std::move(front.value());
         current_index = 0;
-        command.front().value().pop_front();
+        is_forgettable = true;
         return true;
     }
     virtual int cb_add_external_clause_lit() override {
@@ -71,23 +86,21 @@ private:
 
 int main() {
     auto nop = std::nullopt;
-    using lvi = std::list<std::vector<int>>;
     using vi = std::vector<int>;
 
-    Solver s;
-    for (int i = 3; i > 0; --i) s.newVar();
-    s.addClause(intToLit(1), intToLit(2));
-    s.addClause(intToLit(-1), intToLit(3));
+    Solver s; s.varNum(3);
+    s.addClause({
+        vi{1, 2},
+        vi{-1, 3},
+    });
 
     Propagator p({
-        nop,               // 1: -1, 2
-        lvi{
-            vi{1, -2},     // 0: 1, 3
-            vi{-1, -3, 2}  // 0: 1, 3, 2
-        },
+        nop,            // 1: -1, 2
+        vi{1, -2},      // 0: 1, 3
+        vi{-1, -3, 2},  // 0: 1, 3, 2
     });
+    
     s.connect_external_propagator(&p);
-
     bool res = s.solve();
     return res;
 }
