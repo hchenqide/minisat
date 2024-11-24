@@ -6,8 +6,8 @@
 
 class Solver : public Minisat::Solver {
 public:
-    void varNum(size_t num) {
-        while (num--)
+    void maxVar(size_t var) {
+        while (var--)
             newVar();
     }
     void addClause(std::vector<int> c) {
@@ -88,7 +88,7 @@ int main() {
     auto nop = std::nullopt;
     using vi = std::vector<int>;
 
-    Solver s; s.varNum(3);
+    Solver s; s.maxVar(3);
     s.addClause({
         vi{1, 2, 3},
     });

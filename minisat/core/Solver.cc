@@ -1168,8 +1168,8 @@ bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
     Lit a = ps[0], b = ps[1];
     if (value(a) == l_False) {
         assert(value(b) == l_False);
-        assert(a < b);
         if (level(a) == level(b)) {
+            assert(a < b);
             ipasirup_stats.ff_conf++;
             cancelUntil(level(a));
             conflict = cr;
@@ -1210,7 +1210,7 @@ bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
             ipasirup_stats.tu++;
         } else {
             assert(value(b) == l_True);
-            assert(a < b);
+            assert(level(a) < level(b) || (level(a) == level(b) && a < b));
             ipasirup_stats.tt++;
         }
     }
