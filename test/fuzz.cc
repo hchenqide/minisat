@@ -88,6 +88,7 @@ public:
 
 class Propagator : public Minisat::ExternalPropagator {
 public:
+    size_t var_cnt;
     std::vector<std::vector<int>> clauses;
     std::vector<int> current;
     size_t current_index;
@@ -97,8 +98,8 @@ public:
     std::vector<int> assignments;
 
 public:
-    Propagator(std::vector<std::vector<int>> clauses)
-        : clauses(clauses) {
+    Propagator(size_t var_cnt, std::vector<std::vector<int>> clauses)
+        : var_cnt(var_cnt), clauses(clauses) {
     }
 
 public:
@@ -125,7 +126,7 @@ public:
             return false;
         }
 
-        if (bp(gen)) {
+        if (bp(gen) && assignments.size() < var_cnt) {
             return false;
         }
 
@@ -161,12 +162,11 @@ int main(int argc, char** argv) {
     s.maxVar(max_var);
     s.addClause(std::move(initial));
 
-    Propagator p(std::move(rest));
+    Propagator p(max_var, std::move(rest));
     s.connect_external_propagator(&p);
 
     bool res = s.solve();
     seed;
-    p.clauses;
     s.ipasirup_stats;
     return res;
 }

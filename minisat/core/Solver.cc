@@ -740,8 +740,9 @@ lbool Solver::search(int nof_conflicts)
             learnt_clause.clear();
             analyze(confl, learnt_clause, backtrack_level);
             cancelUntil(backtrack_level);
-
+            
             if (learnt_clause.size() == 1){
+                assert(decisionLevel() == 0);
                 uncheckedEnqueue(learnt_clause[0]);
             }else{
                 CRef cr = ca.alloc(learnt_clause, true);
