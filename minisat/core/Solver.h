@@ -323,7 +323,7 @@ public:
 private:
     int calculate_lit_sort_index(Lit lit);
     void sort_clause_solving(vec<Lit>& ps);
-    bool add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate);
+    bool add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, bool& propagate);
 
 protected:
     ExternalPropagator *external_propagator;

@@ -808,7 +808,7 @@ lbool Solver::search(int nof_conflicts)
                         add_tmp.push(intToLit(lit));
                     }
                     bool prop = false;
-                    bool unsat = add_clause_solving(add_tmp, confl, prop);
+                    bool unsat = add_clause_solving(add_tmp, is_forgettable, confl, prop);
                     if (unsat) {
                         return l_False;
                     }
@@ -1103,7 +1103,7 @@ void Solver::sort_clause_solving(vec<Lit>& ps) {
     });
 }
 
-bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
+bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, bool& propagate) {
     // empty clause
     if (ps.size() == 0) {
         ipasirup_stats.unsat++;
@@ -1162,7 +1162,7 @@ bool Solver::add_clause_solving(vec<Lit>& ps, CRef& conflict, bool& propagate) {
         return false;
     }
 
-    CRef cr = ca.alloc(ps, false);
+    CRef cr = ca.alloc(ps, forgettable);
     clauses.push(cr);
     attachClause(cr);
 
