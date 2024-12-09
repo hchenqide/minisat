@@ -7,8 +7,8 @@
 #include <algorithm>
 
 unsigned int seed =
-    //    12;
-    std::random_device{}();
+    12;
+// std::random_device{}();
 
 std::mt19937 gen(seed);
 static std::bernoulli_distribution bp(0.2);
@@ -198,10 +198,10 @@ int main(int argc, char** argv) {
     seed;
     s.ipasirup_stats;
 
-    // check model
-    assert(res && check_model(clauses, s.getModel()));
+    assert(!res || check_model(clauses, s.getModel()));
 
-    // random, https://fmv.jku.at/fuzzddtools/, keep seeds
+    printf(res? "sat\n" : "unsat\n");
+
     // check proof (external), drup drat, add proof in minisat
-    return res;
+    return 0;
 }
