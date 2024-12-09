@@ -3,6 +3,15 @@
 
 #include <vector>
 #include <random>
+#include <unordered_set>
+#include <algorithm>
+
+unsigned int seed =
+    //    12;
+    std::random_device{}();
+
+std::mt19937 gen(seed);
+static std::bernoulli_distribution bp(0.2);
 
 template <class B>
 static std::vector<int> readClause(B& in, int& max_var) {
@@ -49,13 +58,6 @@ static std::vector<std::vector<int>> parse_DIMACS(B& in, int& max_var) {
     return clauses;
 }
 
-unsigned int seed =
-//12;
-std::random_device{}();
-
-std::mt19937 gen(seed);
-static std::bernoulli_distribution bp(0.2);
-
 std::pair<std::vector<std::vector<int>>, std::vector<std::vector<int>>>
 split_clauses(std::vector<std::vector<int>> clauses, float ratio) {
     size_t initial_size = clauses.size() * ratio;
@@ -63,6 +65,15 @@ split_clauses(std::vector<std::vector<int>> clauses, float ratio) {
     return {
         std::vector<std::vector<int>>(std::make_move_iterator(clauses.begin()), std::make_move_iterator(clauses.begin() + initial_size)),
         std::vector<std::vector<int>>(std::make_move_iterator(clauses.begin() + initial_size), std::make_move_iterator(clauses.end()))};
+}
+
+std::pair<std::vector<std::vector<int>>, std::vector<std::vector<int>>>
+copy_split_clauses(std::vector<std::vector<int>> clauses, float ratio) {
+    size_t initial_size = clauses.size() * ratio;
+    assert(initial_size <= clauses.size());
+    return {
+        std::vector<std::vector<int>>(clauses.begin(), clauses.begin() + initial_size),
+        std::vector<std::vector<int>>(clauses.begin() + initial_size, clauses.end())};
 }
 
 class Solver : public Minisat::Solver {
@@ -83,6 +94,15 @@ public:
         for (auto& c : v) {
             addClause(std::move(c));
         }
+    }
+    std::unordered_set<int> getModel() {
+        std::unordered_set<int> res;
+        res.reserve(model.size());
+        for (int i = 0; i < model.size(); i++) {
+            assert(model[i] != Minisat::l_Undef);
+            res.insert(Minisat::LitToint(Minisat::mkLit(i, model[i] == Minisat::l_False)));
+        }
+        return res;
     }
 };
 
@@ -145,6 +165,15 @@ public:
     }
 };
 
+bool check_model(const std::vector<std::vector<int>>& clauses, const std::unordered_set<int>& model) {
+    for (const auto& clause : clauses) {
+        if (std::find_if(clause.begin(), clause.end(), [&](int lit) { return model.count(lit) > 0; }) == clause.end()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 int main(int argc, char** argv) {
     // read cnf
     gzFile in = (argc == 1) ? gzdopen(0, "rb") : gzopen(argv[1], "rb");
@@ -156,7 +185,7 @@ int main(int argc, char** argv) {
     gzclose(in);
 
     // split clauses
-    auto [initial, rest] = split_clauses(clauses, 0.1);
+    auto [initial, rest] = copy_split_clauses(clauses, 0.1);
 
     Solver s;
     s.maxVar(max_var);
@@ -168,5 +197,12 @@ int main(int argc, char** argv) {
     bool res = s.solve();
     seed;
     s.ipasirup_stats;
+
+    // check model
+    assert(res && check_model(clauses, s.getModel()));
+
+    // sanitize, valgrind, asan -fsanitize=address, compiler options
+    // random, https://fmv.jku.at/fuzzddtools/, keep seeds
+    // check proof (external), drup drat, add proof in minisat
     return res;
 }

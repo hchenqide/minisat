@@ -826,9 +826,14 @@ lbool Solver::search(int nof_conflicts)
                 decisions++;
                 next = pickBranchLit();
 
-                if (next == lit_Undef)
+                if (next == lit_Undef) {
+                    // if (external_propagator) {
+                    //     external_propagator->cb_check_found_model()
+                    // }
+
                     // Model found:
                     return l_True;
+                }
             }
 
             // Increase decision level and enqueue 'next'
