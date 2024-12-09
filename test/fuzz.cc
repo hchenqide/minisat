@@ -201,7 +201,6 @@ int main(int argc, char** argv) {
     // check model
     assert(res && check_model(clauses, s.getModel()));
 
-    // sanitize, valgrind, asan -fsanitize=address, compiler options
     // random, https://fmv.jku.at/fuzzddtools/, keep seeds
     // check proof (external), drup drat, add proof in minisat
     return res;

@@ -34,6 +34,8 @@ include_directories(${minisat_SOURCE_DIR})
 # Compile flags:
 
 add_definitions(-D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -Wno-literal-suffix)
+add_compile_options(-fsanitize=address)
+add_link_options(-fsanitize=address)
 
 #--------------------------------------------------------------------------------------------------
 # Build Targets:
