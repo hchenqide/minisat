@@ -307,17 +307,17 @@ protected:
     // ====== BEGIN IPASIR-UP ================================================
 public:
     struct IPASIRUPStats {
-        int unsat = 0;
-        int skipped = 0;
-        int unit = 0;
-        int ff_conf = 0;
-        int ff_prop = 0;
-        int uf = 0;
-        int uu = 0;
-        int tf_prop = 0;
-        int tf_unprop = 0;
-        int tu = 0;
-        int tt = 0;
+        size_t unsat = 0;
+        size_t skipped = 0;
+        size_t unit = 0;
+        size_t ff_conf = 0;
+        size_t ff_prop = 0;
+        size_t uf = 0;
+        size_t uu = 0;
+        size_t tf_prop = 0;
+        size_t tf_unprop = 0;
+        size_t tu = 0;
+        size_t tt = 0;
     } ipasirup_stats;
 
 private:
