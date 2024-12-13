@@ -31,8 +31,8 @@ fi
 for (( round=1; round<=num_rounds; round++ )); do
     echo "Round $round"
 
-    # Step 1: Generate a seed (using the current timestamp and round number for randomness)
-    seed=$((RANDOM + round))
+    # Step 1: Generate a large random positive integer for the seed
+    seed=$(((RANDOM << 15) | RANDOM ))
     echo "seed: $seed"
 
     # Step 2: Run cnfuzz with the seed and redirect output to temp.cnf
