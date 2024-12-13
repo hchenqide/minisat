@@ -90,7 +90,7 @@ public:
         }
         addClause_(add_tmp);
     }
-    void addClause(std::vector<std::vector<int>> v) {
+    void addClauses(std::vector<std::vector<int>> v) {
         for (auto& c : v) {
             addClause(std::move(c));
         }
@@ -118,8 +118,11 @@ public:
     std::vector<int> assignments;
 
 public:
-    Propagator(size_t var_cnt, std::vector<std::vector<int>> clauses)
-        : var_cnt(var_cnt), clauses(clauses) {
+    Propagator(size_t var_cnt) : var_cnt(var_cnt), clauses() {}
+
+public:
+    void setClauses(std::vector<std::vector<int>> clauses) {
+        this->clauses = std::move(clauses);
     }
 
 public:
@@ -168,6 +171,7 @@ public:
 bool check_model(const std::vector<std::vector<int>>& clauses, const std::unordered_set<int>& model) {
     for (const auto& clause : clauses) {
         if (std::find_if(clause.begin(), clause.end(), [&](int lit) { return model.count(lit) > 0; }) == clause.end()) {
+            assert(false);
             return false;
         }
     }
@@ -188,11 +192,12 @@ int main(int argc, char** argv) {
     auto [initial, rest] = copy_split_clauses(clauses, 0.1);
 
     Solver s;
-    s.maxVar(max_var);
-    s.addClause(std::move(initial));
-
-    Propagator p(max_var, std::move(rest));
+    Propagator p(max_var);
     s.connect_external_propagator(&p);
+
+    s.maxVar(max_var);
+    s.addClauses(std::move(initial));
+    p.setClauses(std::move(rest));
 
     bool res = s.solve();
     seed;
