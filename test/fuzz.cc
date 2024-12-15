@@ -214,7 +214,6 @@ int main(int argc, char** argv) {
     seed;
     s.ipasirup_stats;
     assert(!res || check_model(clauses, s.getModel()));
-    printf(res ? "sat\n" : "unsat\n");
 
     // close proof file
     if (s.output) {
@@ -233,5 +232,5 @@ int main(int argc, char** argv) {
         fclose(s.output);
     }
 
-    return 0;
+    return !res;
 }

@@ -644,6 +644,11 @@ void Solver::removeSatisfied(vec<CRef>& cs)
         if (satisfied(c))
             removeClause(cs[i]);
         else{
+            // proof keep original clause for output
+            if (output) {
+                oc.clear(); oc.growTo(c.size()); for (int i = 0; i < c.size(); i++) oc[i] = c[i];
+            }
+
             // Trim clause:
             assert(value(c[0]) == l_Undef && value(c[1]) == l_Undef);
             for (int k = 2; k < c.size(); k++)
@@ -651,6 +656,15 @@ void Solver::removeSatisfied(vec<CRef>& cs)
                     c[k--] = c[c.size()-1];
                     c.pop();
                 }
+
+            // proof output
+            if (output) {
+                if (c.size() != oc.size()) {
+                    outputPrintClause(c);
+                    outputPrintClauseDeleted(oc);
+                }
+            }
+
             cs[j++] = cs[i];
         }
     }

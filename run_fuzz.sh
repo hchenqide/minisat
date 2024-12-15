@@ -54,18 +54,23 @@ for (( round=1; round<=num_rounds; round++ )); do
         exit 5
     fi
 
-    # Step 3: Run the fuzz executable with cnf_file and produce proof_file.
+    # Step 3: Run the fuzz executable with cnf_file and produce proof_file
     $fuzz_executable $cnf_file $proof_file
-    if [ $? -ne 0 ]; then
-        echo "Error: $fuzz_executable failed to process temp.cnf"
-        exit 6
-    fi
+    fuzz_result=$?
+    if [ $fuzz_result -eq 0 ]; then
+        echo "SAT"
+    elif [ $fuzz_result -eq 1 ]; then
+        echo "UNSAT"
 
-    # Step 4: Use the drup checker to validate the proof against the original CNF
-    $drup_checker $cnf_file $proof_file
-    if [ $? -ne 0 ]; then
-        echo "Error: Proof validation failed for round $round"
-        exit 7
+        # Step 4: Use the drup checker to validate the proof against the original CNF
+        $drup_checker $cnf_file $proof_file
+        if [ $? -ne 0 ]; then
+            echo "Error: Proof validation failed for round $round"
+            exit 7
+        fi
+    else
+        echo "Error: $fuzz_executable encountered an error (unexpected return value: $fuzz_result)"
+        exit 6
     fi
 
     echo "-----------------------------------"
