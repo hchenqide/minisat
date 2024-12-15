@@ -303,6 +303,29 @@ protected:
     static inline int irand(double& seed, int size) {
         return (int)(drand(seed) * size); }
 
+    // Proof output
+public:
+    FILE* output;
+    vec<Lit> oc;
+private:
+    void outputPrintClause(const vec<Lit>& ps) {
+        for (int i = 0; i < ps.size(); i++)
+            fprintf(output, "%i ", LitToint(ps[i]));
+        fprintf(output, "0\n");
+    }
+    void outputPrintClause(const Clause& c) {
+        for (int i = 0; i < c.size(); i++)
+            fprintf(output, "%i ", LitToint(c[i]));
+        fprintf(output, "0\n");
+    }
+    void outputPrintClauseDeleted(const vec<Lit>& ps) {
+        fprintf(output, "d ");
+        outputPrintClause(ps);
+    }
+    void outputPrintClauseDeleted(const Clause& c) {
+        fprintf(output, "d ");
+        outputPrintClause(c);
+    }
 
     // ====== BEGIN IPASIR-UP ================================================
 public:

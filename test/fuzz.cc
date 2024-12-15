@@ -178,8 +178,13 @@ bool check_model(const std::vector<std::vector<int>>& clauses, const std::unorde
     return true;
 }
 
+// usage:
+// ./fuzz
+// ./fuzz input.cnf
+// ./fuzz input.cnf output.proof
+
 int main(int argc, char** argv) {
-    // read cnf
+    // read input cnf file
     gzFile in = (argc == 1) ? gzdopen(0, "rb") : gzopen(argv[1], "rb");
     if (in == NULL)
         printf("ERROR! Could not open file: %s\n", argc == 1 ? "<stdin>" : argv[1]), exit(1);
@@ -188,25 +193,45 @@ int main(int argc, char** argv) {
     std::vector<std::vector<int>> clauses = parse_DIMACS(b, max_var);
     gzclose(in);
 
-    // split clauses
-    auto [initial, rest] = copy_split_clauses(clauses, 0.1);
-
+    // initialize solver and propagator
     Solver s;
+    s.maxVar(max_var);
     Propagator p(max_var);
     s.connect_external_propagator(&p);
 
-    s.maxVar(max_var);
+    // open output proof file
+    s.output = (argc >= 3) ? fopen(argv[2], "wb") : NULL;
+
+    // split and assign clauses
+    auto [initial, rest] = copy_split_clauses(clauses, 0.1);
     s.addClauses(std::move(initial));
     p.setClauses(std::move(rest));
 
+    // solve
     bool res = s.solve();
+
+    // check
     seed;
     s.ipasirup_stats;
-
     assert(!res || check_model(clauses, s.getModel()));
+    printf(res ? "sat\n" : "unsat\n");
 
-    printf(res? "sat\n" : "unsat\n");
+    // close proof file
+    if (s.output) {
+        if (res) {
+            // sat, clear content and write assignments
+            fclose(s.output);
+            s.output = fopen(argv[2], "wb");
+            for (int i = 0; i < s.nVars(); i++)
+                if (s.model[i] != Minisat::l_Undef)
+                    fprintf(s.output, "%s%s%d", (i == 0) ? "" : " ", (s.model[i] == Minisat::l_True) ? "" : "-", i + 1);
+            fprintf(s.output, " 0\n");
+        } else {
+            // unsat, append 0
+            fprintf(s.output, "0\n");
+        }
+        fclose(s.output);
+    }
 
-    // check proof (external), drup drat, add proof in minisat
     return 0;
 }

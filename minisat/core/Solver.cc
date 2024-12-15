@@ -158,6 +158,11 @@ bool Solver::addClause_(vec<Lit>& ps)
     assert(decisionLevel() == 0);
     if (!ok) return false;
 
+    // proof keep original clause for output
+    if (output) {
+        ps.copyTo(oc);
+    }
+
     // Check if clause is satisfied and remove false/duplicate literals:
     sort(ps);
     Lit p; int i, j;
@@ -167,6 +172,14 @@ bool Solver::addClause_(vec<Lit>& ps)
         else if (value(ps[i]) != l_False && ps[i] != p)
             ps[j++] = p = ps[i];
     ps.shrink(i - j);
+
+    // proof output
+    if (output) {
+        if (ps.size() != oc.size()) {
+            outputPrintClause(ps);
+            outputPrintClauseDeleted(oc);
+        }
+    }
 
     if (ps.size() == 0)
         return ok = false;
@@ -213,6 +226,10 @@ void Solver::detachClause(CRef cr, bool strict){
 
 void Solver::removeClause(CRef cr) {
     Clause& c = ca[cr];
+// proof print deleted clause
+    if (output) {
+        outputPrintClauseDeleted(c);
+    }
     detachClause(cr);
     // Don't leave pointers to free'd memory!
     if (locked(c)) vardata[var(c[0])].reason = CRef_Undef;
@@ -752,6 +769,11 @@ lbool Solver::search(int nof_conflicts)
                 uncheckedEnqueue(learnt_clause[0], cr);
             }
 
+            // proof print learned clause
+            if (output) {
+                outputPrintClause(learnt_clause);
+            }
+
             varDecayActivity();
             claDecayActivity();
 
@@ -1115,6 +1137,11 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
         return true;
     }
 
+    // proof keep original clause for output
+    if (output) {
+ps.copyTo(oc);
+}
+
     int i, j;
 
     // sort by literal
@@ -1155,6 +1182,14 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
     if (value(ps[0]) == l_True && level(ps[0]) == 0) {
         ipasirup_stats.skipped++;
         return false;
+    }
+
+    // proof output
+    if (output) {
+        if (ps.size() != oc.size()) {
+            outputPrintClause(ps);
+            outputPrintClauseDeleted(oc);
+        }
     }
 
     // unit
