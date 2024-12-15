@@ -328,21 +328,6 @@ private:
     }
 
     // ====== BEGIN IPASIR-UP ================================================
-public:
-    struct IPASIRUPStats {
-        size_t unsat = 0;
-        size_t skipped = 0;
-        size_t unit = 0;
-        size_t ff_conf = 0;
-        size_t ff_prop = 0;
-        size_t uf = 0;
-        size_t uu = 0;
-        size_t tf_prop = 0;
-        size_t tf_unprop = 0;
-        size_t tu = 0;
-        size_t tt = 0;
-    } ipasirup_stats;
-
 private:
     int calculate_lit_sort_index(Lit lit);
     void sort_clause_solving(vec<Lit>& ps);
@@ -351,20 +336,6 @@ private:
 protected:
     ExternalPropagator *external_propagator;
 
-protected:
-    void add_external_clause();
-    /*
-    private:
-        void notify_assignment(const std::vector<int>& lits) {}
-        void notify_new_decision_level() {}
-        void notify_backtrack(size_t new_level) {}
-        bool cb_check_found_model(const std::vector<int>& model) {}
-        int cb_decide() {}
-        int cb_propagate() {}
-        int cb_add_reason_clause_lit(int propagated_lit) {}
-        bool cb_has_external_clause(bool& is_forgettable) {}
-        int cb_add_external_clause_lit() {}
-    */
 public:
     // Add call-back which allows to learn, propagate and backtrack based on
     // external constraints. Only one external propagator can be connected

@@ -211,8 +211,6 @@ int main(int argc, char** argv) {
     bool res = s.solve();
 
     // check
-    seed;
-    s.ipasirup_stats;
     assert(!res || check_model(clauses, s.getModel()));
 
     // close proof file

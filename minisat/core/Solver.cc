@@ -226,7 +226,7 @@ void Solver::detachClause(CRef cr, bool strict){
 
 void Solver::removeClause(CRef cr) {
     Clause& c = ca[cr];
-// proof print deleted clause
+    // proof print deleted clause
     if (output) {
         outputPrintClauseDeleted(c);
     }
@@ -771,7 +771,7 @@ lbool Solver::search(int nof_conflicts)
             learnt_clause.clear();
             analyze(confl, learnt_clause, backtrack_level);
             cancelUntil(backtrack_level);
-            
+
             if (learnt_clause.size() == 1){
                 assert(decisionLevel() == 0);
                 uncheckedEnqueue(learnt_clause[0]);
@@ -1147,14 +1147,13 @@ void Solver::sort_clause_solving(vec<Lit>& ps) {
 bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, bool& propagate) {
     // empty clause
     if (ps.size() == 0) {
-        ipasirup_stats.unsat++;
         return true;
     }
 
     // proof keep original clause for output
     if (output) {
-ps.copyTo(oc);
-}
+        ps.copyTo(oc);
+    }
 
     int i, j;
 
@@ -1169,7 +1168,6 @@ ps.copyTo(oc);
     // find tautology
     for (i = 0; i < ps.size() - 1; i++) {
         if (ps[i] == ~ps[i+1]) {
-            ipasirup_stats.skipped++;
             return false;
         }
     }
@@ -1188,13 +1186,11 @@ ps.copyTo(oc);
 
     // empty
     if (ps.size() == 0) {
-        ipasirup_stats.unsat++;
         return true;
     }
 
     // contains 0-true literals
     if (value(ps[0]) == l_True && level(ps[0]) == 0) {
-        ipasirup_stats.skipped++;
         return false;
     }
 
@@ -1208,8 +1204,6 @@ ps.copyTo(oc);
 
     // unit
     if (ps.size() == 1) {
-        ipasirup_stats.unit++;
-        // backtrack to level 0
         cancelUntil(0);
         uncheckedEnqueue(ps[0]);
         propagate = true;
@@ -1222,16 +1216,11 @@ ps.copyTo(oc);
 
     Lit a = ps[0], b = ps[1];
     if (value(a) == l_False) {
-        assert(value(b) == l_False);
         if (level(a) == level(b)) {
-            assert(a < b);
-            ipasirup_stats.ff_conf++;
             cancelUntil(level(a));
             conflict = cr;
             return false;
         } else {
-            assert(level(a) > level(b));
-            ipasirup_stats.ff_prop++;
             cancelUntil(level(b));
             uncheckedEnqueue(a, cr);
             propagate = true;
@@ -1239,34 +1228,10 @@ ps.copyTo(oc);
         }
     } else if (value(a) == l_Undef) {
         if (value(b) == l_False) {
-            ipasirup_stats.uf++;
             cancelUntil(level(b));
             uncheckedEnqueue(a, cr);
             propagate = true;
             return false;
-        } else {
-            assert(value(b) == l_Undef);
-            assert(a < b);
-            ipasirup_stats.uu++;
-        }
-    } else {
-        assert(value(a) == l_True);
-        if (value(b) == l_False) {
-            if (level(a) > level(b)) {
-                ipasirup_stats.tf_prop++;
-                cancelUntil(level(b));
-                uncheckedEnqueue(a, cr);
-                propagate = true;
-                return false;
-            } else {
-                ipasirup_stats.tf_unprop++;
-            }
-        } else if (value(b) == l_Undef) {
-            ipasirup_stats.tu++;
-        } else {
-            assert(value(b) == l_True);
-            assert(level(a) < level(b) || (level(a) == level(b) && a < b));
-            ipasirup_stats.tt++;
         }
     }
     return false;
