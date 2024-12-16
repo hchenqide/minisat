@@ -335,6 +335,10 @@ private:
     void sort_clause_solving(vec<Lit>& ps);
     bool add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, bool& propagate);
 
+private:
+    int notify_assignment_index = 0;
+    bool notify_backtrack = false;
+    
 protected:
     ExternalPropagator *external_propagator;
 

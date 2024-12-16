@@ -124,6 +124,12 @@ public:
     void setClauses(std::vector<std::vector<int>> clauses) {
         this->clauses = std::move(clauses);
     }
+    bool check_model_assignments(const std::vector<int>& model) {
+        assert(model.size() == assignments.size());
+        std::unordered_set<int> model_set(model.begin(), model.end());
+        std::for_each(assignments.begin(), assignments.end(), [&](int lit) { assert(model_set.count(lit)); });
+        return true;
+    }
 
 public:
     virtual void notify_assignment(const std::vector<int>& lits) override {
@@ -139,6 +145,7 @@ public:
     }
 
     virtual bool cb_check_found_model(const std::vector<int>& model) override {
+        assert(check_model_assignments(model));
         return clauses.empty();
     }
 

@@ -259,9 +259,9 @@ void Solver::cancelUntil(int level) {
         trail.shrink(trail.size() - trail_lim[level]);
         trail_lim.shrink(trail_lim.size() - level);
 
-        if (external_propagator) {
-            external_propagator->notify_backtrack(level);
-        }
+        assert(notify_assignment_index >= trail.size());
+        notify_assignment_index = trail.size();
+        notify_backtrack = true;
     }
 }
 
@@ -523,10 +523,6 @@ void Solver::uncheckedEnqueue(Lit p, CRef from)
     assigns[var(p)] = lbool(!sign(p));
     vardata[var(p)] = mkVarData(from, decisionLevel());
     trail.push_(p);
-
-    if (external_propagator){
-        external_propagator->notify_assignment({LitToint(p)});
-    }
 }
 
 
@@ -836,6 +832,18 @@ lbool Solver::search(int nof_conflicts)
             }
 
             if (external_propagator) {
+                if (notify_backtrack) {
+                    external_propagator->notify_backtrack(decisionLevel());
+                    notify_backtrack = false;
+                }
+                if (notify_assignment_index < trail.size()) {
+                    std::vector<int> new_assignments; new_assignments.reserve(trail.size() - notify_assignment_index);
+                    while(notify_assignment_index < trail.size()) {
+                        new_assignments.push_back(LitToint(trail[notify_assignment_index++]));
+                    }
+                    external_propagator->notify_assignment(new_assignments);
+                }
+
                 bool is_forgettable;
                 while (external_propagator->cb_has_external_clause(is_forgettable)) {
                     add_tmp.clear();
