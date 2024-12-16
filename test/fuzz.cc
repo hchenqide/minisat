@@ -138,7 +138,10 @@ public:
         assignment_level.resize(new_level);
     }
 
-    virtual bool cb_check_found_model(const std::vector<int>& model) override { return true; }
+    virtual bool cb_check_found_model(const std::vector<int>& model) override {
+        return clauses.empty();
+    }
+
     virtual int cb_decide() { return 0; };
     virtual int cb_propagate() { return 0; };
 
@@ -149,7 +152,7 @@ public:
             return false;
         }
 
-        if (bp(gen) && assignments.size() < var_cnt) {
+        if (bp(gen)) {
             return false;
         }
 

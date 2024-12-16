@@ -329,6 +329,8 @@ private:
 
     // ====== BEGIN IPASIR-UP ================================================
 private:
+    std::vector<int> getCurrentModel();
+private:
     int calculate_lit_sort_index(Lit lit);
     void sort_clause_solving(vec<Lit>& ps);
     bool add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, bool& propagate);

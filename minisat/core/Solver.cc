@@ -863,9 +863,9 @@ lbool Solver::search(int nof_conflicts)
                 next = pickBranchLit();
 
                 if (next == lit_Undef) {
-                    // if (external_propagator) {
-                    //     external_propagator->cb_check_found_model()
-                    // }
+                    if (external_propagator && !external_propagator->cb_check_found_model(getCurrentModel())) {
+                        continue;
+                    }
 
                     // Model found:
                     return l_True;
@@ -1127,6 +1127,16 @@ void Solver::garbageCollect()
 
 
 /*===== IPASIR-UP BEGIN ==================================================*/
+
+std::vector<int> Solver::getCurrentModel() {
+    std::vector<int> res; res.reserve(nVars());
+    for (int i = 0; i < nVars(); i++) {
+        if (value(i) != Minisat::l_Undef) {
+            res.push_back(Minisat::LitToint(Minisat::mkLit(i, value(i) == Minisat::l_False)));
+        }
+    }
+    return res;
+}
 
 int Solver::calculate_lit_sort_index(Lit lit) {
     return value(lit) == l_Undef ? 0 : value(lit) == l_False ? (INT_MAX - level(lit))
