@@ -2,7 +2,9 @@
 #include "minisat/core/Solver.h"
 
 #include <vector>
+#include <deque>
 #include <random>
+#include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
 
@@ -109,20 +111,25 @@ public:
 class Propagator : public Minisat::ExternalPropagator {
 public:
     size_t var_cnt;
-    std::vector<std::vector<int>> clauses;
+    std::deque<std::vector<int>> clauses;
     std::vector<int> current;
-    size_t current_index;
+    size_t current_index = 0;
+
+public:
+    std::unordered_map<int, std::vector<int>> unit_clause_map;
+    int lit_explaining = 0;
 
 public:
     std::vector<size_t> assignment_level;
     std::vector<int> assignments;
+    std::unordered_map<int, size_t> assignment_level_map;
 
 public:
     Propagator(size_t var_cnt) : var_cnt(var_cnt), clauses() {}
 
 public:
     void setClauses(std::vector<std::vector<int>> clauses) {
-        this->clauses = std::move(clauses);
+        this->clauses.assign(std::make_move_iterator(clauses.begin()), std::make_move_iterator(clauses.end()));
     }
     bool check_model_assignments(const std::vector<int>& model) {
         assert(model.size() == assignments.size());
@@ -134,12 +141,23 @@ public:
 public:
     virtual void notify_assignment(const std::vector<int>& lits) override {
         assignments.insert(assignments.end(), lits.begin(), lits.end());
+        for(int lit : lits) {
+            assignment_level_map.emplace(lit, assignment_level.size());
+        }
     }
     virtual void notify_new_decision_level() override {
         assignment_level.push_back(assignments.size());
     }
     virtual void notify_backtrack(size_t new_level) override {
         assert(new_level < assignment_level.size());
+        assert(lit_explaining == 0);
+        for (size_t index = assignment_level[new_level]; index < assignments.size(); ++index) {
+            assignment_level_map.erase(assignments[index]);
+            if (auto it = unit_clause_map.find(assignments[index]); it != unit_clause_map.end()) {
+                clauses.push_front(std::move(it->second));
+                unit_clause_map.erase(it);
+            }
+        }
         assignments.resize(assignment_level[new_level]);
         assignment_level.resize(new_level);
     }
@@ -150,9 +168,51 @@ public:
     }
 
     virtual int cb_decide() { return 0; };
-    virtual int cb_propagate() { return 0; };
+    virtual int cb_propagate() {
+        std::vector<int>& front = clauses.front();
+        size_t count_true = 0, count_false = 0, count_undef = 0;
+        size_t count_false_root = 0;
+        int unit;
+        for (int lit : front) {
+            if (assignment_level_map.count(lit)) {
+                count_true++;
+            } else if (assignment_level_map.count(-lit)) {
+                count_false++;
+                if (assignment_level_map[-lit] == 0) {
+                    count_false_root++;
+                }
+            } else {
+                unit = lit;
+                count_undef++;
+            }
+        }
+        if (count_undef == 1 && count_false == front.size() - 1 && count_false_root != count_false) {
+            assert(unit_clause_map.count(unit) == 0);
+            unit_clause_map[unit] = std::move(front);
+            clauses.pop_front();
+            return unit;
+        }
+        return 0;
+    };
 
-    virtual int cb_add_reason_clause_lit(int propagated_lit) { return 0; };
+    virtual int cb_add_reason_clause_lit(int propagated_lit) {
+        if (lit_explaining != propagated_lit) {
+            assert(lit_explaining == 0);
+            lit_explaining = propagated_lit;
+            assert(current.empty() && current_index == 0);
+            assert(unit_clause_map.count(propagated_lit));
+            current = std::move(unit_clause_map[lit_explaining]);
+            unit_clause_map.erase(lit_explaining);
+        }
+        if (current_index >= current.size()) {
+            lit_explaining = 0;
+            current.clear();
+            current_index = 0;
+            return 0;
+        } else {
+            return current[current_index++];
+        }
+    };
 
     virtual bool cb_has_external_clause(bool& is_forgettable) override {
         if (clauses.empty()) {
@@ -163,14 +223,15 @@ public:
             return false;
         }
 
-        current = std::move(clauses.back());
-        clauses.pop_back();
-        current_index = 0;
+        assert(current.empty() && current_index == 0);
+        current = std::move(clauses.front()); clauses.pop_front();
         is_forgettable = true;
         return true;
     }
     virtual int cb_add_external_clause_lit() override {
         if (current_index >= current.size()) {
+            current.clear();
+            current_index = 0;
             return 0;
         } else {
             return current[current_index++];

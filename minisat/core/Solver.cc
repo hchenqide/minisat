@@ -844,6 +844,18 @@ lbool Solver::search(int nof_conflicts)
                     external_propagator->notify_assignment(new_assignments);
                 }
 
+                // request external units 
+                while (true) {
+                    int lit = external_propagator->cb_propagate();
+                    if (lit == 0) { break; }
+                    Lit l = intToLit(lit);
+                    if (value(l) != l_Undef) { continue; }
+                    uncheckedEnqueue(l, sign(l) ? CRef_External_False : CRef_External_True);
+                    notify_assignment_index++; external_propagator->notify_assignment({lit});  // for fuzzer
+                    goto propagate;
+                }
+
+                // request external clause
                 bool is_forgettable;
                 while (external_propagator->cb_has_external_clause(is_forgettable)) {
                     add_tmp.clear();
@@ -1253,6 +1265,81 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
         }
     }
     return false;
+}
+
+CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
+    // empty clause
+    if (ps.size() == 0) {
+        assert(false);
+    }
+
+    // proof keep original clause for output
+    if (output) {
+        ps.copyTo(oc);
+    }
+
+    int i, j;
+
+    // sort by literal
+    sort(ps);
+    // remove duplicate
+    j = i = 0;
+    while (++i < ps.size())
+        if (!(ps[j] == ps[i]) && ++j != i)
+            ps[j] = ps[i];
+    ps.shrink(i - j - 1);
+    // find tautology
+    for (i = 0; i < ps.size() - 1; i++) {
+        if (ps[i] == ~ps[i + 1]) {
+            return false;
+        }
+    }
+
+    // sort by level and assignment
+    // true(low level - high level) - unassigned - false(high level - low level)
+    sort_clause_solving(ps);
+
+    // remove 0-false literals
+    for (i = ps.size() - 1; i >= 0; --i) {
+        if (value(ps[i]) != l_False || level(ps[i]) != 0) {
+            break;
+        }
+    }
+    ps.shrink(ps.size() - 1 - i);
+
+    // empty
+    if (ps.size() == 0) {
+        assert(false);
+    }
+
+    // proof output
+    if (output) {
+        if (ps.size() != oc.size()) {
+            outputPrintClause(ps);
+            outputPrintClauseDeleted(oc);
+        }
+    }
+
+    // unit
+    if (ps.size() == 1) {
+        assert(false);  // can't do it yet
+        Lit a = ps[0];
+        assert(a == unit);
+        assert(value(a) == l_True);
+        return CRef_Undef;
+    }
+
+    Lit a = ps[0], b = ps[1];
+    assert(a == unit);
+    assert(value(a) == l_True);
+    assert(value(b) == l_False);
+    assert(level(a) >= level(b));
+
+    CRef cr = ca.alloc(ps, true);  // lazily added clauses are always forgettable
+    clauses.push(cr);
+    attachClause(cr);
+
+    return cr;
 }
 
 void Solver::connect_external_propagator (ExternalPropagator *external_propagator) {
