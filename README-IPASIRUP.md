@@ -1,19 +1,29 @@
-files:
-- ./cnfuzz.c
-- ./drup-trim.c (exit return values modified)
-- ./minisat (folder)
-- ./test/fuzz.cc
+### related files:
 
-build:
-- gcc cnfuzz.c -O2 -o ./build/cnfuzz
-- gcc drup-trim.c -O2 -o ./build/drup-trim
-- cd ./build; cmake ..; make; cd ..
+./minisat/
 
-fuzz:
-- ./run_fuzz.sh ./build/cnfuzz ./build/fuzz ./build/drup-trim
+./test/fuzz.cc
 
+./cnfuzz.c
 
-extra: (drup-trim diff)
+./drup-trim.c (exit return values modified)
+
+### build:
+
+mkdir ./build
+
+gcc cnfuzz.c -O2 -o ./build/cnfuzz
+
+gcc drup-trim.c -O2 -o ./build/drup-trim
+
+cd ./build; cmake ..; make; cd ..
+
+### fuzz:
+
+./run_fuzz.sh ./build/cnfuzz ./build/fuzz ./build/drup-trim
+
+### extra: (drup-trim diff)
+
 ```
 --- drup-trim.c	2025-01-11 17:26:17.189578400 +0100
 +++ drup-trim-updated.c	2025-01-11 17:22:13.102403600 +0100
