@@ -275,14 +275,16 @@ protected:
     void     detachClause     (CRef cr, bool strict = false); // Detach a clause to watcher lists.
     void     removeClause     (CRef cr);               // Detach and free a clause.
     bool     isRemoved        (CRef cr) const;         // Test if a clause has been removed.
-    bool     locked           (const Clause& c); // Returns TRUE if a clause is a reason for some implication in the current state.
+    bool     locked           (const Clause& c) const; // Returns TRUE if a clause is a reason for some implication in the current state.
     bool     satisfied        (const Clause& c) const; // Returns TRUE if a clause is satisfied in the current state.
 
     // Misc:
     //
     int      decisionLevel    ()      const; // Gives the current decisionlevel.
     uint32_t abstractLevel    (Var x) const; // Used to represent an abstraction of sets of decision levels.
-    CRef     reason           (Var x);
+    CRef     reason           (Var x) const;
+    bool     isReasonLazy     (Var x) const;
+    CRef     reasonLazy       (Var x);
     int      level            (Var x) const;
     int      level            (Lit l) const;
     double   progressEstimate ()      const; // DELETE THIS ?? IT'S NOT VERY USEFUL ...
@@ -516,9 +518,11 @@ public:
 //=================================================================================================
 // Implementation of inline methods:
 
-inline CRef Solver::reason(Var x) {
+inline CRef Solver::reason(Var x) const { return vardata[x].reason; }
+inline bool Solver::isReasonLazy(Var x) const { return reason(x) == CRef_External_True || reason(x) == CRef_External_False; }
+inline CRef Solver::reasonLazy(Var x) {
     if (external_propagator) {
-        if (vardata[x].reason == CRef_External_True || vardata[x].reason == CRef_External_False) {
+        if (isReasonLazy(x)) {
             Lit l = mkLit(x, vardata[x].reason == CRef_External_False);
             int unit = LitToint(l);
             add_tmp.clear();
@@ -531,6 +535,7 @@ inline CRef Solver::reason(Var x) {
     }
     return vardata[x].reason;
 }
+
 inline int  Solver::level (Var x) const { return vardata[x].level; }
 inline int  Solver::level (Lit l) const { return level(var(l)); }
 
@@ -573,7 +578,7 @@ inline bool     Solver::addClause       (Lit p, Lit q, Lit r)   { add_tmp.clear(
 inline bool     Solver::addClause       (Lit p, Lit q, Lit r, Lit s){ add_tmp.clear(); add_tmp.push(p); add_tmp.push(q); add_tmp.push(r); add_tmp.push(s); return addClause_(add_tmp); }
 
 inline bool     Solver::isRemoved       (CRef cr)         const { return ca[cr].mark() == 1; }
-inline bool     Solver::locked          (const Clause& c) { return value(c[0]) == l_True && reason(var(c[0])) != CRef_Undef && ca.lea(reason(var(c[0]))) == &c; }
+inline bool     Solver::locked          (const Clause& c) const { return value(c[0]) == l_True && reason(var(c[0])) != CRef_Undef && !isReasonLazy(var(c[0])) && ca.lea(reason(var(c[0]))) == &c; }
 inline void     Solver::newDecisionLevel()                      {
     trail_lim.push(trail.size());
     if (external_propagator) {
