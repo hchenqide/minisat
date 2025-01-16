@@ -101,8 +101,6 @@ Solver::Solver() :
   , conflict_budget    (-1)
   , propagation_budget (-1)
   , asynch_interrupt   (false)
-
-  , external_propagator(nullptr)
 {}
 
 
@@ -259,9 +257,11 @@ void Solver::cancelUntil(int level) {
         trail.shrink(trail.size() - trail_lim[level]);
         trail_lim.shrink(trail_lim.size() - level);
 
-        assert(notify_assignment_index >= trail.size());
-        notify_assignment_index = trail.size();
-        notify_backtrack = true;
+        if (external_propagator) {
+            assert(notify_assignment_index >= trail.size());
+            notify_assignment_index = trail.size();
+            notify_backtrack = true;
+        }
     }
 }
 
@@ -832,6 +832,7 @@ lbool Solver::search(int nof_conflicts)
             }
 
             if (external_propagator) {
+                // notify backtrack and assignment
                 if (notify_backtrack) {
                     external_propagator->notify_backtrack(decisionLevel());
                     notify_backtrack = false;
@@ -1166,11 +1167,7 @@ int Solver::calculate_lit_sort_index(Lit lit) {
 void Solver::sort_clause_solving(vec<Lit>& ps) {
     sort(ps, [this](Lit a, Lit b) {
         int la = calculate_lit_sort_index(a), lb = calculate_lit_sort_index(b);
-        if (la == lb) {
-            return a < b;
-        } else{
-            return la < lb;
-        }
+        return la == lb ? a < b : la < lb;
     });
 }
 
@@ -1291,7 +1288,7 @@ CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
     // find tautology
     for (i = 0; i < ps.size() - 1; i++) {
         if (ps[i] == ~ps[i + 1]) {
-            return false;
+            assert(false);
         }
     }
 
@@ -1344,6 +1341,10 @@ CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
 
 void Solver::connect_external_propagator (ExternalPropagator *external_propagator) {
     this->external_propagator = external_propagator;
+    notify_assignment_index = 0;
+    notify_backtrack = false;
+
+    // notify existing assignments and levels?
 }
 
 void Solver::disconnect_external_propagator () {

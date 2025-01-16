@@ -305,7 +305,7 @@ protected:
 
     // Proof output
 public:
-    FILE* output;
+    FILE* output = NULL;
     vec<Lit> oc;
 private:
     void outputPrintClause(const vec<Lit>& ps) {
@@ -332,7 +332,7 @@ private:
     static constexpr CRef CRef_External_True = CRef_Undef - 1;
     static constexpr CRef CRef_External_False = CRef_Undef - 2;
 protected:
-    ExternalPropagator *external_propagator;
+    ExternalPropagator *external_propagator = nullptr;
 private:
     int notify_assignment_index = 0;
     bool notify_backtrack = false;
