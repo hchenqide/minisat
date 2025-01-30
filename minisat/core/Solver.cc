@@ -1243,11 +1243,14 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
 
     Lit a = ps[0], b = ps[1];
     if (value(a) == l_False) {
+        assert(value(b) == l_False);
         if (level(a) == level(b)) {
+            assert(a < b);
             cancelUntil(level(a));
             conflict = cr;
             return false;
         } else {
+            assert(level(a) > level(b));
             cancelUntil(level(b));
             uncheckedEnqueue(a, cr);
             propagate = true;
@@ -1259,6 +1262,23 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
             uncheckedEnqueue(a, cr);
             propagate = true;
             return false;
+        } else {
+            assert(value(b) == l_Undef);
+            assert(a < b);
+        }
+    } else {
+        assert(value(a) == l_True);
+        if (value(b) == l_False) {
+            if (level(a) > level(b)) {
+                cancelUntil(level(b));
+                uncheckedEnqueue(a, cr);
+                propagate = true;
+                return false;
+            }
+        } else if (value(b) == l_Undef) {
+        } else {
+            assert(value(b) == l_True);
+            assert(level(a) < level(b) || (level(a) == level(b) && a < b));
         }
     }
     return false;
