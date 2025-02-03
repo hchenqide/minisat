@@ -851,8 +851,9 @@ lbool Solver::search(int nof_conflicts)
                     if (lit == 0) { break; }
                     Lit l = intToLit(lit);
                     if (value(l) != l_Undef) { continue; }
+                    // value(l) == l_False should cause conflict
                     uncheckedEnqueue(l, sign(l) ? CRef_External_False : CRef_External_True);
-                    notify_assignment_index++; external_propagator->notify_assignment({lit});  // for fuzzer
+                    notify_assignment_index++; external_propagator->notify_assignment({lit});  // notify immediately to synchorize with external_propagator
                     goto propagate;
                 }
 
@@ -1350,7 +1351,7 @@ CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
     assert(a == unit);
     assert(value(a) == l_True);
     assert(value(b) == l_False);
-    assert(level(a) >= level(b));
+    assert(level(a) >= level(b));  // level(a) > level(b) is possible
 
     CRef cr = ca.alloc(ps, true);  // lazily added clauses are always forgettable
     clauses.push(cr);
