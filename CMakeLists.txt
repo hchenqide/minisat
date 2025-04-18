@@ -88,11 +88,6 @@ add_library(minisatup-lib-static STATIC ${MINISATUP_LIB_SOURCES})
 set_target_properties(minisatup-lib-static PROPERTIES OUTPUT_NAME minisatup EXPORT_NAME MinisatUP)
 add_library(MinisatUP::MinisatUP ALIAS minisatup-lib-static)
 
-target_include_directories(minisatup-lib-static PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-)
-
 install(FILES minisat/minisatup.h DESTINATION include)
 
 # create MinisatUP package
