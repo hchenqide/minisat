@@ -4,6 +4,40 @@
 namespace Minisat {
 
 class SolverInterface : public Solver {
+    // IPASIR interface
+public:
+    void add(int lit) {
+        if (lit) {
+            add_tmp.push(intToLit(lit));
+        } else {
+            addClause_(add_tmp);
+            add_tmp.clear();
+        }
+    }
+    void assume(int lit) {
+        assumptions.push(intToLit(lit));
+    }
+    int solve() {
+        lbool status = solve_();
+        assumptions.clear();
+        if (status == l_True) {
+            return 10;
+        } else if(status == l_False) {
+            return 20;
+        } else {
+            return 0;
+        }
+    }
+    int val(int lit) {
+        lbool value = modelValue(intToLit(lit));
+        assert(value != l_Undef);
+        return value == l_True ? lit : -lit;
+    }
+    bool failed(int lit) {
+        return conflict.has(intToLit(lit));
+    }
+
+    // CaDiCaL interface
 public:
     int fixed(int lit) const {
         Lit l = intToLit(lit);
@@ -26,11 +60,15 @@ struct SolverData {
 };
 
 Solver::Solver() : data(new SolverData()) {}
-
 Solver::~Solver() {}
 
-int Solver::fixed(int lit) const { return data->solver.fixed(lit); }
+void Solver::add(int lit) { return data->solver.add(lit); }
+void Solver::assume(int lit) { return data->solver.assume(lit); }
+int Solver::solve() { return data->solver.solve(); }
+int Solver::val(int lit) { return data->solver.val(lit); }
+bool Solver::failed(int lit) { return data->solver.failed(lit); }
 
+int Solver::fixed(int lit) const { return data->solver.fixed(lit); }
 bool Solver::trace_proof(const char *path) { return data->solver.output = fopen(path, "wb"); }
 
 } // namespace MinisatUP
