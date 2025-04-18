@@ -13,6 +13,11 @@ namespace MinisatUP {
 
 class ExternalPropagator;
 
+// Cadical interfaces
+class FixedAssignmentListener;
+class Terminator;
+class Learner;
+
 class Solver {
 private:
     std::unique_ptr<Minisat::Solver> solver;
@@ -20,6 +25,36 @@ private:
 public:
     Solver();
     ~Solver();
+
+    // Cadical interfaces
+public:
+    void add(int lit);
+    void assume(int lit);
+    int solve();
+    int val(int lit);
+    bool failed(int lit);
+    void terminate();
+    int fixed(int lit) const;
+    void phase(int lit);
+    bool set(const char *name, int val);
+    bool limit(const char *arg, int val);
+    bool trace_proof(const char *path);
+    void connect_fixed_listener(FixedAssignmentListener *fixed_listener);
+    // void disconnect_fixed_listener();
+    void connect_terminator(Terminator *terminator);
+    // void disconnect_terminator();
+    void connect_learner(Learner *learner);
+    // void disconnect_learner();
+
+    // IPASIR-UP
+public:
+    void connect_external_propagator(MinisatUP::ExternalPropagator *external_propagator);
+    // void disconnect_external_propagator();
+    void add_observed_var(int var);
+    void remove_observed_var(int var);
+    // void reset_observed_vars();
+    bool is_decision(int lit);
+    // void force_backtrack(size_t new_level);
 };
 
 /*------------------------------------------------------------------------*/
@@ -122,6 +157,32 @@ public:
     // The actual function called to add the external clause.
     //
     virtual int cb_add_external_clause_lit() = 0;
+};
+
+
+// Cadical interfaces
+
+class FixedAssignmentListener
+{
+public:
+    virtual ~FixedAssignmentListener() {}
+
+    virtual void notify_fixed_assignment(int) = 0;
+};
+
+class Learner
+{
+public:
+    virtual ~Learner() {}
+    virtual bool learning(int size) = 0;
+    virtual void learn(int lit) = 0;
+};
+
+class Terminator
+{
+public:
+    virtual ~Terminator() {}
+    virtual bool terminate() = 0;
 };
 
 } // namespace MinisatUP
