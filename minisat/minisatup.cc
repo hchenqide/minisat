@@ -37,6 +37,22 @@ public:
         return conflict.has(intToLit(lit));
     }
 
+    // IPASIR-UP interface
+public:
+    void connect_external_propagator(MinisatUP::ExternalPropagator *external_propagator) {
+        assert(false);
+        Solver::connect_external_propagator(external_propagator);
+    }
+    void add_observed_var(int var) {
+        assert(false);
+    }
+    void remove_observed_var(int var) {
+        assert(false);
+    }
+    bool is_decision(int lit) {
+        assert(false);
+    }
+
     // CaDiCaL interface
 public:
     int fixed(int lit) const {
@@ -67,6 +83,11 @@ void Solver::assume(int lit) { return data->solver.assume(lit); }
 int Solver::solve() { return data->solver.solve(); }
 int Solver::val(int lit) { return data->solver.val(lit); }
 bool Solver::failed(int lit) { return data->solver.failed(lit); }
+
+void Solver::connect_external_propagator(MinisatUP::ExternalPropagator *external_propagator) { return data->solver.connect_external_propagator(external_propagator); }
+void Solver::add_observed_var(int var) { return data->solver.add_observed_var(var); }
+void Solver::remove_observed_var(int var) { return data->solver.remove_observed_var(var); }
+bool Solver::is_decision(int lit) { return data->solver.is_decision(lit); }
 
 int Solver::fixed(int lit) const { return data->solver.fixed(lit); }
 bool Solver::trace_proof(const char *path) { return data->solver.output = fopen(path, "wb"); }
