@@ -86,3 +86,6 @@ install(TARGETS minisat-lib-static minisat-lib-shared minisat_core minisat_simp
 install(DIRECTORY minisat/mtl minisat/utils minisat/core minisat/simp
         DESTINATION include/minisat
         FILES_MATCHING PATTERN "*.h")
+
+install(FILES minisat/minisatup.h
+        DESTINATION include)
