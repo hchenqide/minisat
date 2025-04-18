@@ -4,10 +4,18 @@
 namespace Minisat {
 
 class SolverInterface : public Solver {
+private:
+    void ensureVar(Var var) {
+        while (var >= nVars()) {
+            newVar();
+        }
+    }
+
     // IPASIR interface
 public:
     void add(int lit) {
         if (lit) {
+            ensureVar(var(intToLit(lit)));
             add_tmp.push(intToLit(lit));
         } else {
             addClause_(add_tmp);
@@ -15,6 +23,7 @@ public:
         }
     }
     void assume(int lit) {
+        ensureVar(var(intToLit(lit)));
         assumptions.push(intToLit(lit));
     }
     int solve() {
@@ -34,7 +43,7 @@ public:
         return value == l_True ? lit : -lit;
     }
     bool failed(int lit) {
-        return conflict.has(intToLit(lit));
+        return conflict.has(intToLit(-lit));
     }
 
     // IPASIR-UP interface
