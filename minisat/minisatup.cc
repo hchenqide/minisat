@@ -15,7 +15,7 @@ private:
 public:
     void add(int lit) {
         if (lit) {
-            ensureVar(var(intToLit(lit)));
+            ensureVar(intToVar(lit));
             add_tmp.push(intToLit(lit));
         } else {
             addClause_(add_tmp);
@@ -23,7 +23,7 @@ public:
         }
     }
     void assume(int lit) {
-        ensureVar(var(intToLit(lit)));
+        ensureVar(intToVar(lit));
         assumptions.push(intToLit(lit));
     }
     int solve() {
@@ -49,17 +49,17 @@ public:
     // IPASIR-UP interface
 public:
     void connect_external_propagator(MinisatUP::ExternalPropagator *external_propagator) {
-        assert(false);
         Solver::connect_external_propagator(external_propagator);
     }
     void add_observed_var(int var) {
-        assert(false);
+        ensureVar(intToVar(var));
     }
     void remove_observed_var(int var) {
-        assert(false);
+        assert(true);
     }
     bool is_decision(int lit) {
-        assert(false);
+        Var v = intToVar(lit);
+        return vardata[v].reason == CRef_Undef && level(v) > 0;
     }
 
     // CaDiCaL interface
