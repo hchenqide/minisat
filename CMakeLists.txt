@@ -43,8 +43,7 @@ set(MINISAT_LIB_SOURCES
     minisat/utils/Options.cc
     minisat/utils/System.cc
     minisat/core/Solver.cc
-    minisat/simp/SimpSolver.cc
-    minisat/minisatup.cc)
+    minisat/simp/SimpSolver.cc)
 
 add_library(minisat-lib-static STATIC ${MINISAT_LIB_SOURCES})
 add_library(minisat-lib-shared SHARED ${MINISAT_LIB_SOURCES})
@@ -76,6 +75,61 @@ set_target_properties(minisat-lib-shared
 set_target_properties(minisat_simp       PROPERTIES OUTPUT_NAME "minisat")
 
 #--------------------------------------------------------------------------------------------------
+# MinisatUP Package:
+
+# build MinisatUP target
+set(MINISATUP_LIB_SOURCES
+    minisat/utils/Options.cc
+    minisat/utils/System.cc
+    minisat/core/Solver.cc
+    minisat/minisatup.cc)
+
+add_library(minisatup-lib-static STATIC ${MINISATUP_LIB_SOURCES})
+set_target_properties(minisatup-lib-static PROPERTIES OUTPUT_NAME minisatup EXPORT_NAME MinisatUP)
+add_library(MinisatUP::MinisatUP ALIAS minisatup-lib-static)
+
+target_include_directories(minisatup-lib-static PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+install(FILES minisat/minisatup.h DESTINATION include)
+
+# create MinisatUP package
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/MinisatUPConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/MinisatUPConfig.cmake
+  INSTALL_DESTINATION lib/cmake/MinisatUP
+)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/MinisatUPConfigVersion.cmake
+  VERSION 1.0
+  COMPATIBILITY SameMajorVersion
+)
+
+install(TARGETS minisatup-lib-static
+  EXPORT MinisatUPTargets
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
+
+install(EXPORT MinisatUPTargets
+  NAMESPACE MinisatUP::
+  DESTINATION lib/cmake/MinisatUP
+)
+
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/MinisatUPConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/MinisatUPConfigVersion.cmake
+  DESTINATION lib/cmake/MinisatUP
+)
+
+#--------------------------------------------------------------------------------------------------
 # Installation targets:
 
 install(TARGETS minisat-lib-static minisat-lib-shared minisat_core minisat_simp
@@ -86,6 +140,3 @@ install(TARGETS minisat-lib-static minisat-lib-shared minisat_core minisat_simp
 install(DIRECTORY minisat/mtl minisat/utils minisat/core minisat/simp
         DESTINATION include/minisat
         FILES_MATCHING PATTERN "*.h")
-
-install(FILES minisat/minisatup.h
-        DESTINATION include)
