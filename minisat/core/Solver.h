@@ -475,6 +475,8 @@ inline bool     Solver::locked          (const Clause& c) const { return value(c
 inline void     Solver::newDecisionLevel()                      {
     trail_lim.push(trail.size());
     if (external_propagator) {
+        assert(notify_backtrack == false);
+        assert(notify_assignment_index == trail.size());
         external_propagator->notify_new_decision_level();
     }
 }

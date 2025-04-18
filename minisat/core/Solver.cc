@@ -824,6 +824,21 @@ lbool Solver::search(int nof_conflicts)
                 // Reduce the set of learnt clauses:
                 reduceDB();
 
+            // before newDecisionLevel(), notify external propagator about backtrack and assignment
+            if (external_propagator) {
+                if (notify_backtrack) {
+                    external_propagator->notify_backtrack(decisionLevel());
+                    notify_backtrack = false;
+                }
+                if (notify_assignment_index < trail.size()) {
+                    std::vector<int> new_assignments; new_assignments.reserve(trail.size() - notify_assignment_index);
+                    while(notify_assignment_index < trail.size()) {
+                        new_assignments.push_back(LitToint(trail[notify_assignment_index++]));
+                    }
+                    external_propagator->notify_assignment(new_assignments);
+                }
+            }
+
             Lit next = lit_Undef;
             while (decisionLevel() < assumptions.size()){
                 // Perform user provided assumption:
@@ -840,29 +855,15 @@ lbool Solver::search(int nof_conflicts)
                 }
             }
 
-            if (external_propagator) {
-                // notify backtrack and assignment
-                if (notify_backtrack) {
-                    external_propagator->notify_backtrack(decisionLevel());
-                    notify_backtrack = false;
-                }
-                if (notify_assignment_index < trail.size()) {
-                    std::vector<int> new_assignments; new_assignments.reserve(trail.size() - notify_assignment_index);
-                    while(notify_assignment_index < trail.size()) {
-                        new_assignments.push_back(LitToint(trail[notify_assignment_index++]));
-                    }
-                    external_propagator->notify_assignment(new_assignments);
-                }
-
-                // request external units 
+            if (next == lit_Undef && external_propagator) {
+                // if there is no next decision from assumptions, request external units 
                 while (true) {
                     int lit = external_propagator->cb_propagate();
                     if (lit == 0) { break; }
                     Lit l = intToLit(lit);
-                    if (value(l) != l_Undef) { continue; }
-                    // value(l) == l_False should cause conflict
+                    assert(value(l) == l_Undef);
                     uncheckedEnqueue(l, sign(l) ? CRef_External_False : CRef_External_True);
-                    notify_assignment_index++; external_propagator->notify_assignment({lit});  // notify immediately to synchorize with external_propagator
+                    notify_assignment_index++; external_propagator->notify_assignment({lit});  // notify immediately to fuzzer for keeping unit_clause_map
                     goto propagate;
                 }
 
@@ -1369,13 +1370,14 @@ CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
     return cr;
 }
 
-void Solver::connect_external_propagator(MinisatUP::ExternalPropagator *external_propagator)
-{
+void Solver::connect_external_propagator(MinisatUP::ExternalPropagator *external_propagator) {
     this->external_propagator = external_propagator;
     notify_assignment_index = 0;
     notify_backtrack = false;
 
     // notify existing assignments and levels?
+    assert(trail.size() == 0);
+    assert(decisionLevel() == 0);
 }
 
 void Solver::disconnect_external_propagator () {
