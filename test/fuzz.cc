@@ -169,6 +169,9 @@ public:
 
     virtual int cb_decide() { return 0; };
     virtual int cb_propagate() {
+        if (clauses.empty()) {
+            return 0;
+        }
         std::vector<int>& front = clauses.front();
         size_t count_true = 0, count_false = 0, count_undef = 0;
         size_t count_false_root = 0;
