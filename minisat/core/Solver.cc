@@ -762,7 +762,9 @@ lbool Solver::search(int nof_conflicts)
         if (confl != CRef_Undef){
             // CONFLICT
             conflicts++; conflictC++;
-            if (decisionLevel() == 0) return l_False;
+
+            int conflict_level = decisionLevel();
+            if (conflict_level == 0) return l_False;
 
             learnt_clause.clear();
             analyze(confl, learnt_clause, backtrack_level);
@@ -799,6 +801,13 @@ lbool Solver::search(int nof_conflicts)
                            (int)max_learnts, nLearnts(), (double)learnts_literals/nLearnts(), progressEstimate()*100);
             }
 
+            // exit early if an assumed literal causes the conflict
+            if (conflict_level <= assumptions.size()) {
+                assert(learnt_clause[0] == ~assumptions[conflict_level-1]);
+                assert(value(assumptions[conflict_level-1]) == l_False);
+                analyzeFinal(learnt_clause[0], conflict);
+                return l_False;
+            }
         }else{
             // NO CONFLICT
             if ((nof_conflicts >= 0 && conflictC >= nof_conflicts) || !withinBudget()){
