@@ -846,6 +846,7 @@ lbool Solver::search(int nof_conflicts)
                 if (value(p) == l_True){
                     // Dummy decision level:
                     newDecisionLevel();
+// Chenqi: newDecisionLevel is not necessary if we track the index for next assumption
                 }else if (value(p) == l_False){
                     analyzeFinal(~p, conflict);
                     return l_False;
