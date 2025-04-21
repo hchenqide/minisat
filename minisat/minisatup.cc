@@ -28,6 +28,7 @@ public:
     }
     int solve() {
         lbool status = solve_();
+        add_tmp.clear();
         assumptions.clear();
         if (status == l_True) {
             return 10;
