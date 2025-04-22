@@ -1000,6 +1000,12 @@ lbool Solver::solve_()
         ok = false;
 
     cancelUntil(0);
+
+    if (external_propagator && notify_backtrack) {
+        external_propagator->notify_backtrack(decisionLevel());
+        notify_backtrack = false;
+    }
+
     return status;
 }
 
