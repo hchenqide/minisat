@@ -135,6 +135,7 @@ Var Solver::newVar(lbool upol, bool dvar)
     user_pol .insert(v, upol);
     decision .reserve(v);
     trail    .capacity(v+1);
+// Chenqi: there's no need to reserve space for decision and trail, if it's going to be unsat
     setDecisionVar(v, dvar);
     return v;
 }
