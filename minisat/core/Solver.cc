@@ -279,9 +279,8 @@ Lit Solver::pickBranchLit()
         int lit = external_propagator->cb_decide();
         if (lit != 0) {
             Lit l = intToLit(lit);
-            if (value(lit) == l_Undef) {
-                return l;
-            }
+            assert(value(l) == l_Undef);
+            return l;
         }
     }
 
