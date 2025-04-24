@@ -844,9 +844,12 @@ lbool Solver::search(int nof_conflicts)
                 // Perform user provided assumption:
                 Lit p = assumptions[decisionLevel()];
                 if (value(p) == l_True){
-                    // Dummy decision level:
-                    newDecisionLevel();
-// Chenqi: newDecisionLevel is not necessary if we track the index for next assumption
+                    // remove true literals from assumptions until the next false literal, shifting the following ones
+                    int curr = decisionLevel(), next = curr + 1;
+                    while (next < assumptions.size() && value(assumptions[next]) == l_True) { next++; }
+                    while (next < assumptions.size()) { assumptions[curr++] = assumptions[next++]; }
+                    assumptions.shrink(next - curr);
+                    continue;
                 }else if (value(p) == l_False){
                     analyzeFinal(~p, conflict);
                     return l_False;
