@@ -824,8 +824,8 @@ lbool Solver::search(int nof_conflicts)
                 // Reduce the set of learnt clauses:
                 reduceDB();
 
-            // before newDecisionLevel(), notify external propagator about backtrack and assignment
             if (external_propagator) {
+                // notify external propagator of backtrack and assignment
                 if (notify_backtrack) {
                     external_propagator->notify_backtrack(decisionLevel());
                     notify_backtrack = false;
@@ -837,30 +837,8 @@ lbool Solver::search(int nof_conflicts)
                     }
                     external_propagator->notify_assignment(new_assignments);
                 }
-            }
 
-            Lit next = lit_Undef;
-            while (decisionLevel() < assumptions.size()){
-                // Perform user provided assumption:
-                Lit p = assumptions[decisionLevel()];
-                if (value(p) == l_True){
-                    // remove true literals from assumptions until the next false literal, shifting the following ones
-                    int curr = decisionLevel(), next = curr + 1;
-                    while (next < assumptions.size() && value(assumptions[next]) == l_True) { next++; }
-                    while (next < assumptions.size()) { assumptions[curr++] = assumptions[next++]; }
-                    assumptions.shrink(next - curr);
-                    continue;
-                }else if (value(p) == l_False){
-                    analyzeFinal(~p, conflict);
-                    return l_False;
-                }else{
-                    next = p;
-                    break;
-                }
-            }
-
-            if (next == lit_Undef && external_propagator) {
-                // if there is no next decision from assumptions, request external units 
+                // request external units 
                 while (true) {
                     int lit = external_propagator->cb_propagate();
                     if (lit == 0) { break; }
@@ -890,6 +868,26 @@ lbool Solver::search(int nof_conflicts)
                     if (confl != CRef_Undef) {
                         goto analyze;
                     }
+                }
+            }
+
+            Lit next = lit_Undef;
+            while (decisionLevel() < assumptions.size()){
+                // Perform user provided assumption:
+                Lit p = assumptions[decisionLevel()];
+                if (value(p) == l_True){
+                    // remove true literals from assumptions until the next false literal, shifting the following ones
+                    int curr = decisionLevel(), next = curr + 1;
+                    while (next < assumptions.size() && value(assumptions[next]) == l_True) { next++; }
+                    while (next < assumptions.size()) { assumptions[curr++] = assumptions[next++]; }
+                    assumptions.shrink(next - curr);
+                    continue;
+                }else if (value(p) == l_False){
+                    analyzeFinal(~p, conflict);
+                    return l_False;
+                }else{
+                    next = p;
+                    break;
                 }
             }
 
