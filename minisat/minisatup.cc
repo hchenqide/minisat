@@ -28,6 +28,7 @@ public:
     }
     int solve() {
         lbool status = solve_();
+        clearInterrupt();
         add_tmp.clear();
         assumptions.clear();
         if (status == l_True) {
@@ -65,15 +66,22 @@ public:
 
     // CaDiCaL interface
 public:
-    int fixed(int lit) const {
-        Lit l = intToLit(lit);
-        if (value(lit) == l_Undef) {
-            return 0;
-        }
-        if (level(lit) != 0) {
-            return 0;
-        }
-        return value(lit) == l_True;
+    void terminate() {
+        interrupt();
+    }
+    int fixed(int var) const {
+        Var v = intToVar(var);
+        return value(v) != l_Undef && level(v) == 0;
+    }
+    void phase(int lit) {
+        setPolarity(intToVar(lit), lit > 0 ? l_True : l_False);
+    }
+    bool trace_proof(const char *path) {
+        if (output) { fclose(output); }
+        return (output = fopen(path, "wb")) != nullptr;
+    }
+    void connect_terminator(MinisatUP::Terminator *terminator) {
+        Solver::connect_terminator(terminator);
     }
 };
 
@@ -99,7 +107,10 @@ void Solver::add_observed_var(int var) { return data->solver.add_observed_var(va
 void Solver::remove_observed_var(int var) { return data->solver.remove_observed_var(var); }
 bool Solver::is_decision(int lit) { return data->solver.is_decision(lit); }
 
+void Solver::terminate() { return data->solver.terminate(); }
 int Solver::fixed(int lit) const { return data->solver.fixed(lit); }
-bool Solver::trace_proof(const char *path) { return data->solver.output = fopen(path, "wb"); }
+void Solver::phase(int lit) { return data->solver.phase(lit); }
+bool Solver::trace_proof(const char *path) { return data->solver.trace_proof(path); }
+void Solver::connect_terminator(MinisatUP::Terminator *terminator) { return data->solver.connect_terminator(terminator); }
 
 } // namespace MinisatUP

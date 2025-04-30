@@ -405,6 +405,12 @@ public:
     void force_backtrack (size_t new_level);
 
     // ====== END IPASIR-UP ==================================================
+
+    // CaDiCal interface
+protected:
+    MinisatUP::Terminator* terminator = nullptr;
+public:
+    void connect_terminator(MinisatUP::Terminator* terminator) { this->terminator = terminator; }
 };
 
 
@@ -509,6 +515,7 @@ inline void     Solver::clearInterrupt(){ asynch_interrupt = false; }
 inline void     Solver::budgetOff(){ conflict_budget = propagation_budget = -1; }
 inline bool     Solver::withinBudget() const {
     return !asynch_interrupt &&
+           !terminator->terminate() &&
            (conflict_budget    < 0 || conflicts < (uint64_t)conflict_budget) &&
            (propagation_budget < 0 || propagations < (uint64_t)propagation_budget); }
 

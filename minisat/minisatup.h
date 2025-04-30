@@ -46,11 +46,11 @@ public:
 public:
     bool set(const char *name, int val) { return false; }
     bool limit(const char *arg, int val) { return false; }
-    void terminate() {}
+    void terminate();
     int fixed(int lit) const;
-    void phase(int lit) {}
+    void phase(int lit);
     bool trace_proof(const char *path);
-    void connect_terminator(Terminator *terminator) {}
+    void connect_terminator(Terminator *terminator);
     // void disconnect_terminator();
     void connect_learner(Learner *learner) {}
     // void disconnect_learner();
