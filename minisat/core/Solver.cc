@@ -27,6 +27,12 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 using namespace Minisat;
 
+
+// debug print vec<Lit>, vec<Var>
+void print_vec_lit(const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(v[i])); printf("\n"); }
+void print_vec_var(const vec<Var>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(mkLit(v[i]))); printf("\n"); }
+
+
 //=================================================================================================
 // Options:
 
