@@ -189,7 +189,7 @@ public:
                 count_undef++;
             }
         }
-        if (count_undef == 1 && count_false == front.size() - 1 && count_false_root != count_false) {
+        if (count_undef == 1 && count_false == front.size() - 1) {
             assert(unit_clause_map.count(unit) == 0);
             unit_clause_map[unit] = std::move(front);
             clauses.pop_front();

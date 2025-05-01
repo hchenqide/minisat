@@ -356,6 +356,7 @@ void Solver::analyze(CRef confl, vec<Lit>& out_learnt, int& out_btlevel)
             if (!seen[var(q)] && level(var(q)) > 0){
                 varBumpActivity(var(q));
                 seen[var(q)] = 1;
+                analyze_toclear.push(q);
                 if (level(var(q)) >= decisionLevel())
                     pathC++;
                 else
@@ -510,10 +511,16 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
                 assert(level(x) > 0);
                 out_conflict.insert(~trail[i]);
             }else{
-                Clause& c = ca[reasonLazy(x)];
-                for (int j = 1; j < c.size(); j++)
-                    if (level(var(c[j])) > 0)
-                        seen[var(c[j])] = 1;
+                try {
+                    Clause& c = ca[reasonLazy(x)];
+                    for (int j = 1; j < c.size(); j++)
+                        if (level(var(c[j])) > 0)
+                            seen[var(c[j])] = 1;
+                } catch (Lit l) {
+                    assert(l == trail[i]);
+                    assert(level(x) > 0);
+                    out_conflict.insert(~l);
+                }
             }
             seen[x] = 0;
         }
@@ -771,11 +778,19 @@ lbool Solver::search(int nof_conflicts)
             if (decisionLevel() == 0) return l_False;
 
             learnt_clause.clear();
-            analyze(confl, learnt_clause, backtrack_level);
+            // unit clauses that are added lazily will throw this unit as exception and break analyze
+            try {
+                analyze(confl, learnt_clause, backtrack_level);
+            } catch (Lit l) {
+                for (int i = 0; i < analyze_toclear.size(); i++) seen[var(analyze_toclear[i])] = 0;
+                cancelUntil(0);
+                uncheckedEnqueue(l);
+                continue;
+            }
+
             cancelUntil(backtrack_level);
 
             if (learnt_clause.size() == 1){
-                assert(decisionLevel() == 0);
                 uncheckedEnqueue(learnt_clause[0]);
             }else{
                 CRef cr = ca.alloc(learnt_clause, true);
@@ -841,7 +856,7 @@ lbool Solver::search(int nof_conflicts)
                     if (lit == 0) { break; }
                     Lit l = intToLit(lit);
                     assert(value(l) == l_Undef);
-                    uncheckedEnqueue(l, sign(l) ? CRef_External_False : CRef_External_True);
+                    uncheckedEnqueue(l, decisionLevel() == 0? CRef_Undef : sign(l) ? CRef_External_False : CRef_External_True);
                     notify_assignment_index++; external_propagator->notify_assignment({lit});  // notify immediately to fuzzer for keeping unit_clause_map
                     goto propagate;
                 }
@@ -1294,6 +1309,25 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
     return false;
 }
 
+CRef Solver::reasonLazy(Var x) {
+    if (external_propagator) {
+        if (isReasonLazy(x)) {
+            Lit l = mkLit(x, vardata[x].reason == CRef_External_False);
+            int unit = LitToint(l);
+            add_tmp.clear();
+            int lit;
+            while (lit = external_propagator->cb_add_reason_clause_lit(unit)) {
+                add_tmp.push(intToLit(lit));
+            }
+            vardata[x].reason = add_clause_lazy(l, add_tmp);
+            if (vardata[x].reason == CRef_Undef) {
+                throw l;
+            }
+        }
+    }
+    return vardata[x].reason;
+}
+
 CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
     // empty clause
     if (ps.size() == 0) {
@@ -1349,7 +1383,6 @@ CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
 
     // unit
     if (ps.size() == 1) {
-        assert(false);  // can't do it yet
         Lit a = ps[0];
         assert(a == unit);
         assert(value(a) == l_True);

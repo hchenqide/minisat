@@ -419,21 +419,6 @@ public:
 
 inline CRef Solver::reason(Var x) const { return vardata[x].reason; }
 inline bool Solver::isReasonLazy(Var x) const { return reason(x) == CRef_External_True || reason(x) == CRef_External_False; }
-inline CRef Solver::reasonLazy(Var x) {
-    if (external_propagator) {
-        if (isReasonLazy(x)) {
-            Lit l = mkLit(x, vardata[x].reason == CRef_External_False);
-            int unit = LitToint(l);
-            add_tmp.clear();
-            int lit;
-            while (lit = external_propagator->cb_add_reason_clause_lit(unit)) {
-                add_tmp.push(intToLit(lit));
-            }
-            vardata[x].reason = add_clause_lazy(l, add_tmp);
-        }
-    }
-    return vardata[x].reason;
-}
 
 inline int  Solver::level (Var x) const { return vardata[x].level; }
 inline int  Solver::level (Lit l) const { return level(var(l)); }
