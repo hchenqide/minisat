@@ -74,7 +74,7 @@ public:
         return value(v) != l_Undef && level(v) == 0;
     }
     void phase(int lit) {
-        setPolarity(intToVar(lit), lit > 0 ? l_True : l_False);
+        setPolarity(intToVar(lit), lit < 0 ? l_True : l_False);
     }
     bool trace_proof(const char *path) {
         if (output) { fclose(output); }
