@@ -83,6 +83,9 @@ public:
     void connect_terminator(MinisatUP::Terminator *terminator) {
         Solver::connect_terminator(terminator);
     }
+    void connect_learner(MinisatUP::Learner *learner) {
+        Solver::connect_learner(learner);
+    }
 };
 
 } // namespace Minisat
@@ -112,5 +115,6 @@ int Solver::fixed(int lit) const { return data->solver.fixed(lit); }
 void Solver::phase(int lit) { return data->solver.phase(lit); }
 bool Solver::trace_proof(const char *path) { return data->solver.trace_proof(path); }
 void Solver::connect_terminator(MinisatUP::Terminator *terminator) { return data->solver.connect_terminator(terminator); }
+void Solver::connect_learner(MinisatUP::Learner *learner) { return data->solver.connect_learner(learner); }
 
 } // namespace MinisatUP

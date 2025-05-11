@@ -52,7 +52,7 @@ public:
     bool trace_proof(const char *path);
     void connect_terminator(Terminator *terminator);
     // void disconnect_terminator();
-    void connect_learner(Learner *learner) {}
+    void connect_learner(Learner *learner);
     // void disconnect_learner();
     void connect_fixed_listener(FixedAssignmentListener *fixed_listener) {}
     // void disconnect_fixed_listener();

@@ -409,8 +409,10 @@ public:
     // CaDiCal interface
 protected:
     MinisatUP::Terminator* terminator = nullptr;
+    MinisatUP::Learner* learner = nullptr;
 public:
     void connect_terminator(MinisatUP::Terminator* terminator) { this->terminator = terminator; }
+    void connect_learner(MinisatUP::Learner* learner) { this->learner = learner; }
 };
 
 

@@ -795,6 +795,13 @@ lbool Solver::search(int nof_conflicts)
                 continue;
             }
 
+            if (learner) {
+                for (int i = 0; i < learnt_clause.size(); i++) {
+                    learner->learn(LitToint(learnt_clause[i]));
+                }
+                learner->learn(0);
+            }
+
             cancelUntil(backtrack_level);
 
             if (learnt_clause.size() == 1){
