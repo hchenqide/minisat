@@ -511,16 +511,22 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
                 assert(level(x) > 0);
                 out_conflict.insert(~trail[i]);
             }else{
+                CRef ref;
                 try {
-                    Clause& c = ca[reasonLazy(x)];
-                    for (int j = 1; j < c.size(); j++)
-                        if (level(var(c[j])) > 0)
-                            seen[var(c[j])] = 1;
-                } catch (Lit l) {
-                    assert(l == trail[i]);
-                    assert(level(x) > 0);
-                    out_conflict.insert(~l);
+                    ref = reasonLazy(x);
+                } catch (std::tuple<int, Lit, CRef> t) {
+                    auto [level, lit, c] = t;
+                    assert(lit == trail[i]);
+                    ref = vardata[x].reason = c;
+                    if (ref == CRef_Undef) {
+                        assert(level == 0);
+                        continue;
+                    }
                 }
+                Clause& c = ca[ref];
+                for (int j = 1; j < c.size(); j++)
+                    if (level(var(c[j])) > 0)
+                        seen[var(c[j])] = 1;
             }
             seen[x] = 0;
         }
@@ -781,10 +787,11 @@ lbool Solver::search(int nof_conflicts)
             // unit clauses that are added lazily will throw this unit as exception and break analyze
             try {
                 analyze(confl, learnt_clause, backtrack_level);
-            } catch (Lit l) {
+            } catch (std::tuple<int, Lit, CRef> t) {
                 for (int i = 0; i < analyze_toclear.size(); i++) seen[var(analyze_toclear[i])] = 0;
-                cancelUntil(0);
-                uncheckedEnqueue(l);
+                auto [level, lit, c] = t;
+                cancelUntil(level);
+                uncheckedEnqueue(lit, c);
                 continue;
             }
 
@@ -1320,9 +1327,6 @@ CRef Solver::reasonLazy(Var x) {
                 add_tmp.push(intToLit(lit));
             }
             vardata[x].reason = add_clause_lazy(l, add_tmp);
-            if (vardata[x].reason == CRef_Undef) {
-                throw l;
-            }
         }
     }
     return vardata[x].reason;
@@ -1386,18 +1390,22 @@ CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
         Lit a = ps[0];
         assert(a == unit);
         assert(value(a) == l_True);
-        return CRef_Undef;
+        throw std::tuple<int, Lit, CRef>(0, a, CRef_Undef);
     }
 
     Lit a = ps[0], b = ps[1];
     assert(a == unit);
     assert(value(a) == l_True);
     assert(value(b) == l_False);
-    assert(level(a) >= level(b));  // level(a) > level(b) is possible
+    assert(level(a) >= level(b));
 
     CRef cr = ca.alloc(ps, true);  // lazily added clauses are always forgettable
     clauses.push(cr);
     attachClause(cr);
+
+    if (level(a) > level(b)) {
+        throw std::tuple<int, Lit, CRef>(level(b), a, cr);
+    }
 
     return cr;
 }
