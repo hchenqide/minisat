@@ -924,12 +924,11 @@ lbool Solver::search(int nof_conflicts)
                 decisions++;
                 next = pickBranchLit();
 
-                // next == lit_Undef <-> trail.size() == nVars() <-> order_heap.empty()
+                // next == lit_Undef <-> trail.size() == nVars() -> order_heap.empty()
                 assert(trail.size() <= nVars());
                 assert(next != lit_Undef || trail.size() == nVars());
                 assert(trail.size() < nVars() || next == lit_Undef);
                 assert(next != lit_Undef || order_heap.empty());
-                assert(!order_heap.empty() || next == lit_Undef);
 
                 if (next == lit_Undef) {
                     if (external_propagator && !external_propagator->cb_check_found_model(getCurrentModel())) {
