@@ -283,11 +283,11 @@ Lit Solver::pickBranchLit()
 
     if (external_propagator) {
         if (trail.size() < nVars()) {
-            int lit = external_propagator->cb_decide();
-            if (lit != 0) {
+            while (int lit = external_propagator->cb_decide()) {
                 Lit l = intToLit(lit);
-                assert(value(l) == l_Undef);
-                return l;
+                if (value(l) == l_Undef) {
+                    return l;
+                }
             }
         }
     }
@@ -871,6 +871,24 @@ lbool Solver::search(int nof_conflicts)
                     int lit = external_propagator->cb_propagate();
                     if (lit == 0) { break; }
                     Lit l = intToLit(lit);
+                    if (value(l) == l_True) {
+                        continue;
+                    }
+                    if (value(l) == l_False) {
+                        external_get_reason(l, add_tmp);
+                        bool prop = false;
+                        bool unsat = add_clause_solving(add_tmp, true, confl, prop);
+                        if (unsat) {
+                            return l_False;
+                        }
+                        if (prop) {
+                            goto propagate;
+                        }
+                        if (confl != CRef_Undef) {
+                            goto analyze;
+                        }
+                        assert(false);
+                    }
                     assert(value(l) == l_Undef);
                     uncheckedEnqueue(l, decisionLevel() == 0? CRef_Undef : sign(l) ? CRef_External_False : CRef_External_True);
                     notify_assignment_index++; external_propagator->notify_assignment({lit});  // notify immediately to fuzzer for keeping unit_clause_map
@@ -1331,23 +1349,26 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
     return false;
 }
 
+void Solver::external_get_reason(Lit lit, vec<Lit>& ps) {
+    ps.clear();
+    int l = LitToint(lit);
+    while (int curr = external_propagator->cb_add_reason_clause_lit(l)) {
+        ps.push(intToLit(curr));
+    }
+}
+
 CRef Solver::reasonLazy(Var x) {
     if (external_propagator) {
         if (isReasonLazy(x)) {
             Lit l = mkLit(x, vardata[x].reason == CRef_External_False);
-            int unit = LitToint(l);
-            add_tmp.clear();
-            int lit;
-            while (lit = external_propagator->cb_add_reason_clause_lit(unit)) {
-                add_tmp.push(intToLit(lit));
-            }
+            external_get_reason(l, add_tmp);
             vardata[x].reason = add_clause_lazy(l, add_tmp);
         }
     }
     return vardata[x].reason;
 }
 
-CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
+CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     // empty clause
     if (ps.size() == 0) {
         assert(false);
@@ -1403,13 +1424,13 @@ CRef Solver::add_clause_lazy(Lit unit, vec<Lit>& ps) {
     // unit
     if (ps.size() == 1) {
         Lit a = ps[0];
-        assert(a == unit);
+        assert(a == lit);
         assert(value(a) == l_True);
         throw std::tuple<int, Lit, CRef>(0, a, CRef_Undef);
     }
 
     Lit a = ps[0], b = ps[1];
-    assert(a == unit);
+    assert(a == lit);
     assert(value(a) == l_True);
     assert(value(b) == l_False);
     assert(level(a) >= level(b));
