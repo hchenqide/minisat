@@ -108,7 +108,7 @@ public:
     }
 };
 
-class Propagator : public MinisatUP::ExternalPropagator {
+class Propagator : public MiniSatUP::ExternalPropagator {
 public:
     size_t var_cnt;
     std::deque<std::vector<int>> clauses;

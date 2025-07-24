@@ -327,7 +327,7 @@ private:
     static constexpr CRef CRef_External_True = CRef_Undef - 1;
     static constexpr CRef CRef_External_False = CRef_Undef - 2;
 protected:
-    MinisatUP::ExternalPropagator *external_propagator = nullptr;
+    MiniSatUP::ExternalPropagator *external_propagator = nullptr;
 private:
     int notify_assignment_index = 0;
     bool notify_backtrack = false;
@@ -351,7 +351,7 @@ public:
     //   require (VALID)
     //   ensure (VALID)
     //
-    void connect_external_propagator(MinisatUP::ExternalPropagator *external_propagator);
+    void connect_external_propagator(MiniSatUP::ExternalPropagator *external_propagator);
     void disconnect_external_propagator ();
 
     // Mark as 'observed' those variables that are relevant to the external
@@ -409,11 +409,11 @@ public:
 
     // CaDiCal interface
 protected:
-    MinisatUP::Terminator* terminator = nullptr;
-    MinisatUP::Learner* learner = nullptr;
+    MiniSatUP::Terminator* terminator = nullptr;
+    MiniSatUP::Learner* learner = nullptr;
 public:
-    void connect_terminator(MinisatUP::Terminator* terminator) { this->terminator = terminator; }
-    void connect_learner(MinisatUP::Learner* learner) { this->learner = learner; }
+    void connect_terminator(MiniSatUP::Terminator* terminator) { this->terminator = terminator; }
+    void connect_learner(MiniSatUP::Learner* learner) { this->learner = learner; }
 };
 
 

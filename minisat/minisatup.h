@@ -5,7 +5,7 @@
 #include <vector>
 #include <memory>
 
-namespace MinisatUP {
+namespace MiniSatUP {
 
 class ExternalPropagator;
 
@@ -34,7 +34,7 @@ public:
 
     // IPASIR-UP interface
 public:
-    void connect_external_propagator(MinisatUP::ExternalPropagator *external_propagator);
+    void connect_external_propagator(MiniSatUP::ExternalPropagator *external_propagator);
     // void disconnect_external_propagator();
     void add_observed_var(int var);
     void remove_observed_var(int var);
@@ -185,6 +185,6 @@ public:
     virtual void notify_fixed_assignment(int) = 0;
 };
 
-} // namespace MinisatUP
+} // namespace MiniSatUP
 
 #endif // MINISATUP_H

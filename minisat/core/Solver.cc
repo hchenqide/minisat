@@ -1446,7 +1446,7 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     return cr;
 }
 
-void Solver::connect_external_propagator(MinisatUP::ExternalPropagator *external_propagator) {
+void Solver::connect_external_propagator(MiniSatUP::ExternalPropagator *external_propagator) {
     this->external_propagator = external_propagator;
     notify_assignment_index = 0;
     notify_backtrack = false;
