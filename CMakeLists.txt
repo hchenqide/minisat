@@ -74,55 +74,14 @@ set_target_properties(minisat-lib-shared
 
 set_target_properties(minisat_simp       PROPERTIES OUTPUT_NAME "minisat")
 
-#--------------------------------------------------------------------------------------------------
-# MiniSatUP Package:
-
-# build MiniSatUP target
+# MiniSatUP
 set(MINISATUP_LIB_SOURCES
     minisat/utils/Options.cc
     minisat/utils/System.cc
     minisat/core/Solver.cc
     minisat/minisatup.cc)
-
 add_library(minisatup-lib-static STATIC ${MINISATUP_LIB_SOURCES})
-set_target_properties(minisatup-lib-static PROPERTIES OUTPUT_NAME minisatup EXPORT_NAME MiniSatUP)
-add_library(MiniSatUP::MiniSatUP ALIAS minisatup-lib-static)
-
-install(FILES minisat/minisatup.h DESTINATION include)
-
-# create MiniSatUP package
-include(CMakePackageConfigHelpers)
-
-configure_package_config_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/MiniSatUPConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/MiniSatUPConfig.cmake
-  INSTALL_DESTINATION lib/cmake/MiniSatUP
-)
-
-write_basic_package_version_file(
-  ${CMAKE_CURRENT_BINARY_DIR}/MiniSatUPConfigVersion.cmake
-  VERSION 1.0
-  COMPATIBILITY SameMajorVersion
-)
-
-install(TARGETS minisatup-lib-static
-  EXPORT MiniSatUPTargets
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-  INCLUDES DESTINATION include
-)
-
-install(EXPORT MiniSatUPTargets
-  NAMESPACE MiniSatUP::
-  DESTINATION lib/cmake/MiniSatUP
-)
-
-install(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/MiniSatUPConfig.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/MiniSatUPConfigVersion.cmake
-  DESTINATION lib/cmake/MiniSatUP
-)
+set_target_properties(minisatup-lib-static PROPERTIES OUTPUT_NAME "minisatup")
 
 #--------------------------------------------------------------------------------------------------
 # Installation targets:
