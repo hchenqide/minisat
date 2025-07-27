@@ -1435,7 +1435,7 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     assert(value(b) == l_False);
     assert(level(a) >= level(b));
 
-    CRef cr = ca.alloc(ps, true);  // lazily added clauses are always forgettable
+    CRef cr = ca.alloc(ps, false);
     clauses.push(cr);
     attachClause(cr);
 
