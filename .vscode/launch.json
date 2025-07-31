@@ -22,7 +22,8 @@
           "ignoreFailures": true
         }
       ],
-      "preLaunchTask": "build minisat"
+      // "preLaunchTask": "generate cnf"
+      // "preLaunchTask": "build minisat"
     }
   ]
 }

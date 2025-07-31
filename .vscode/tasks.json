@@ -15,6 +15,15 @@
       "options": {
         "cwd": "${workspaceFolder}/build"
       }
+    },
+    {
+      "label": "generate cnf",
+      "type": "shell",
+      "command": "seed=$(((RANDOM << 15) | RANDOM)); echo $seed; ./cnfuzz $seed > temp.cnf",
+      "problemMatcher": [],
+      "options": {
+        "cwd": "${workspaceFolder}/build"
+      }
     }
   ]
 }
