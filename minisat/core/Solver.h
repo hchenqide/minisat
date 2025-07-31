@@ -330,10 +330,13 @@ public:
         size_t unsat = 0;
         size_t skipped = 0;
         size_t unit = 0;
+        size_t watched = 0;
+        size_t ff = 0;
         size_t ff_conf = 0;
         size_t ff_prop = 0;
         size_t uf = 0;
         size_t uu = 0;
+        size_t tf = 0;
         size_t tf_prop = 0;
         size_t tf_unprop = 0;
         size_t tu = 0;

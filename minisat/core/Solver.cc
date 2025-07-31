@@ -1334,6 +1334,8 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
         return false;
     }
 
+    ipasirup_stats.watched++;
+
     CRef cr = ca.alloc(ps, forgettable);
     clauses.push(cr);
     attachClause(cr);
@@ -1341,6 +1343,7 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
     Lit a = ps[0], b = ps[1];
     if (value(a) == l_False) {
         assert(value(b) == l_False);
+        ipasirup_stats.ff++;
         if (level(a) == level(b)) {
             assert(a < b);
             ipasirup_stats.ff_conf++;
@@ -1371,6 +1374,7 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
     } else {
         assert(value(a) == l_True);
         if (value(b) == l_False) {
+            ipasirup_stats.tf++;
             if (level(a) > level(b)) {
                 ipasirup_stats.tf_prop++;
                 cancelUntil(level(b));
