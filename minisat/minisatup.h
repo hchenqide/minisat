@@ -41,6 +41,7 @@ public:
     // void reset_observed_vars();
     bool is_decision(int lit);
     // void force_backtrack(size_t new_level);
+    void phase(int lit);
 
     // CaDiCal interface
 public:
@@ -48,7 +49,6 @@ public:
     bool limit(const char *arg, int val) { return false; }
     void terminate();
     int fixed(int lit) const;
-    void phase(int lit);
     bool trace_proof(const char *path);
     void connect_terminator(Terminator *terminator);
     // void disconnect_terminator();

@@ -63,6 +63,9 @@ public:
         Var v = intToVar(lit);
         return vardata[v].reason == CRef_Undef && level(v) > 0;
     }
+    void phase(int lit) {
+        setPolarity(intToVar(lit), lit < 0 ? l_True : l_False);
+    }
 
     // CaDiCaL interface
 public:
@@ -72,9 +75,6 @@ public:
     int fixed(int var) const {
         Var v = intToVar(var);
         return value(v) != l_Undef && level(v) == 0;
-    }
-    void phase(int lit) {
-        setPolarity(intToVar(lit), lit < 0 ? l_True : l_False);
     }
     bool trace_proof(const char *path) {
         if (output) { fclose(output); }
@@ -109,10 +109,10 @@ void Solver::connect_external_propagator(MiniSatUP::ExternalPropagator *external
 void Solver::add_observed_var(int var) { return data->solver.add_observed_var(var); }
 void Solver::remove_observed_var(int var) { return data->solver.remove_observed_var(var); }
 bool Solver::is_decision(int lit) { return data->solver.is_decision(lit); }
+void Solver::phase(int lit) { return data->solver.phase(lit); }
 
 void Solver::terminate() { return data->solver.terminate(); }
 int Solver::fixed(int lit) const { return data->solver.fixed(lit); }
-void Solver::phase(int lit) { return data->solver.phase(lit); }
 bool Solver::trace_proof(const char *path) { return data->solver.trace_proof(path); }
 void Solver::connect_terminator(MiniSatUP::Terminator *terminator) { return data->solver.connect_terminator(terminator); }
 void Solver::connect_learner(MiniSatUP::Learner *learner) { return data->solver.connect_learner(learner); }
