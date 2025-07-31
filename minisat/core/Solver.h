@@ -344,8 +344,7 @@ public:
     } ipasirup_stats;
 
 private:
-    static constexpr CRef CRef_External_True = CRef_Undef - 1;
-    static constexpr CRef CRef_External_False = CRef_Undef - 2;
+    static constexpr CRef CRef_External = CRef_Undef - 1;
 protected:
     MiniSatUP::ExternalPropagator *external_propagator = nullptr;
 private:
@@ -441,7 +440,7 @@ public:
 // Implementation of inline methods:
 
 inline CRef Solver::reason(Var x) const { return vardata[x].reason; }
-inline bool Solver::isReasonLazy(Var x) const { return reason(x) == CRef_External_True || reason(x) == CRef_External_False; }
+inline bool Solver::isReasonLazy(Var x) const { return reason(x) == CRef_External; }
 
 inline int  Solver::level (Var x) const { return vardata[x].level; }
 inline int  Solver::level (Lit l) const { return level(var(l)); }

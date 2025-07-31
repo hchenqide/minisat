@@ -890,7 +890,7 @@ lbool Solver::search(int nof_conflicts)
                         assert(false);
                     }
                     assert(value(l) == l_Undef);
-                    uncheckedEnqueue(l, decisionLevel() == 0? CRef_Undef : sign(l) ? CRef_External_False : CRef_External_True);
+                    uncheckedEnqueue(l, decisionLevel() == 0? CRef_Undef : CRef_External);
                     notify_assignment_index++; external_propagator->notify_assignment({lit});  // notify immediately to fuzzer for keeping unit_clause_map
                     goto propagate;
                 }
@@ -1409,7 +1409,8 @@ void Solver::external_get_reason(Lit lit, vec<Lit>& ps) {
 CRef Solver::reasonLazy(Var x) {
     if (external_propagator) {
         if (isReasonLazy(x)) {
-            Lit l = mkLit(x, vardata[x].reason == CRef_External_False);
+            assert(assigns[x] != l_Undef);
+            Lit l = mkLit(x, assigns[x] == l_False);
             external_get_reason(l, add_tmp);
             vardata[x].reason = add_clause_lazy(l, add_tmp);
         }
