@@ -284,6 +284,9 @@ int main(int argc, char** argv) {
     // solve
     bool res = s.solve();
 
+    seed;
+    s.ipasirup_stats;
+
     // check
     assert(!res || check_model(clauses, s.getModel()));
 

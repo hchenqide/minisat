@@ -1266,6 +1266,7 @@ void Solver::sort_clause_solving(vec<Lit>& ps) {
 bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, bool& propagate) {
     // empty clause
     if (ps.size() == 0) {
+        ipasirup_stats.unsat++;
         return true;
     }
 
@@ -1287,6 +1288,7 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
     // find tautology
     for (i = 0; i < ps.size() - 1; i++) {
         if (ps[i] == ~ps[i+1]) {
+            ipasirup_stats.skipped++;
             return false;
         }
     }
@@ -1305,11 +1307,13 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
 
     // empty
     if (ps.size() == 0) {
+        ipasirup_stats.unsat++;
         return true;
     }
 
     // contains 0-true literals
     if (value(ps[0]) == l_True && level(ps[0]) == 0) {
+        ipasirup_stats.skipped++;
         return false;
     }
 
@@ -1323,6 +1327,7 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
 
     // unit
     if (ps.size() == 1) {
+        ipasirup_stats.unit++;
         cancelUntil(0);
         uncheckedEnqueue(ps[0]);
         propagate = true;
@@ -1338,11 +1343,13 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
         assert(value(b) == l_False);
         if (level(a) == level(b)) {
             assert(a < b);
+            ipasirup_stats.ff_conf++;
             cancelUntil(level(a));
             conflict = cr;
             return false;
         } else {
             assert(level(a) > level(b));
+            ipasirup_stats.ff_prop++;
             cancelUntil(level(b));
             uncheckedEnqueue(a, cr);
             propagate = true;
@@ -1350,6 +1357,7 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
         }
     } else if (value(a) == l_Undef) {
         if (value(b) == l_False) {
+            ipasirup_stats.uf++;
             cancelUntil(level(b));
             uncheckedEnqueue(a, cr);
             propagate = true;
@@ -1357,23 +1365,33 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
         } else {
             assert(value(b) == l_Undef);
             assert(a < b);
+            ipasirup_stats.uu++;
+            return false;
         }
     } else {
         assert(value(a) == l_True);
         if (value(b) == l_False) {
             if (level(a) > level(b)) {
+                ipasirup_stats.tf_prop++;
                 cancelUntil(level(b));
                 uncheckedEnqueue(a, cr);
                 propagate = true;
                 return false;
+            } else {
+                ipasirup_stats.tf_unprop++;
+                return false;
             }
         } else if (value(b) == l_Undef) {
+            ipasirup_stats.tu++;
+            return false;
         } else {
             assert(value(b) == l_True);
             assert(level(a) < level(b) || (level(a) == level(b) && a < b));
+            ipasirup_stats.tt++;
+            return false;
         }
     }
-    return false;
+    assert(false);
 }
 
 void Solver::external_get_reason(Lit lit, vec<Lit>& ps) {
