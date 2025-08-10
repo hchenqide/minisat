@@ -349,7 +349,8 @@ void Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt, int& o
     // Generate conflict clause:
     //
     out_learnt.push();      // (leave room for the asserting literal)
-    int index   = trail.size() - 1;
+    vec<Lit> &current_trail = trail_level[analyze_level];
+    int i = current_trail.size() - 1, j = i;
 
     do{
         assert(confl != CRef_Undef); // (otherwise should be UIP)
@@ -373,14 +374,31 @@ void Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt, int& o
         }
         
         // Select next clause to look at:
-        while (!seen[var(trail[index--])]);
-        p     = trail[index+1];
+        while(true) {
+            assert(j >= 0);
+            Var v = var(current_trail[j]);
+            assert(level(v) <= analyze_level);
+            if (level(v) == analyze_level) {
+                current_trail[i--] = current_trail[j];
+                if (seen[v]) {
+                    break;
+                }
+            }
+            j--;
+        }
+
+        p     = current_trail[j];
         confl = reasonLazy(var(p));
         seen[var(p)] = 0;
         pathC--;
 
     }while (pathC > 0);
     out_learnt[0] = ~p;
+
+    for (++i, ++i, ++j; i < current_trail.size(); ++i, ++j){
+        current_trail[j] = current_trail[i];
+    }
+    current_trail.shrink(i - j);
 
     // Simplify conflict clause:
     //
@@ -512,32 +530,44 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
 
     seen[var(p)] = 1;
 
-    for (int i = trail.size()-1; i >= trail_lim[0]; i--){
-        Var x = var(trail[i]);
-        if (seen[x]){
-            if (reason(x) == CRef_Undef){
-                assert(level(x) > 0);
-                out_conflict.insert(~trail[i]);
-            }else{
-                CRef ref;
-                try {
-                    ref = reasonLazy(x);
-                } catch (std::tuple<int, Lit, CRef> t) {
-                    auto [level, lit, c] = t;
-                    assert(lit == trail[i]);
-                    ref = vardata[x].reason = c;
+    for (int l = decisionLevel(); l > 0; l--) {
+        vec<Lit>& current_trail = trail_level[l];
+        int i, j;
+        for (i = j = current_trail.size() - 1; j >= 0; j--) {
+            Var x = var(current_trail[j]);
+            assert(level(x) <= l);
+            if (level(x) < l) {
+                continue;
+            }
+            current_trail[i--] = current_trail[j];
+            if (seen[x]) {
+                if (reason(x) == CRef_Undef) {
+                    out_conflict.insert(~current_trail[j]);
+                } else {
+                    CRef ref = reasonLazy(x);
                     if (ref == CRef_Undef) {
-                        assert(level == 0);
+                        assert(level(x) == 0);
+                        seen[x] = 0;
                         continue;
                     }
+                    if (level(x) < l) {
+                        assert(ref != CRef_Undef);
+                        i++;
+                        continue;
+                    }
+                    Clause& c = ca[ref];
+                    for (int j = 1; j < c.size(); j++)
+                        if (level(var(c[j])) > 0)
+                            seen[var(c[j])] = 1;
                 }
-                Clause& c = ca[ref];
-                for (int j = 1; j < c.size(); j++)
-                    if (level(var(c[j])) > 0)
-                        seen[var(c[j])] = 1;
+                seen[x] = 0;
             }
-            seen[x] = 0;
         }
+
+        for (++i, ++j; i < current_trail.size(); ++i, ++j){
+            current_trail[j] = current_trail[i];
+        }
+        current_trail.shrink(i - j);
     }
 
     seen[var(p)] = 0;
