@@ -106,7 +106,9 @@ Solver::Solver() :
   , conflict_budget    (-1)
   , propagation_budget (-1)
   , asynch_interrupt   (false)
-{}
+{
+    trail_level.push();
+}
 
 
 Solver::~Solver()
@@ -277,7 +279,7 @@ void Solver::cancelUntil(int l) {
 
         trail.shrink(i - j);
         trail_lim.shrink(trail_lim.size() - l);
-        trail_level.resize(l + 1);
+        trail_level.shrink(trail_lim.size() - l);
     }
 }
 
@@ -420,13 +422,11 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
 
     // Simplify conflict clause:
     //
-    int i, j;
     out_learnt.copyTo(analyze_toclear);
     if (ccmin_mode == 2){
         for (i = j = 1; i < out_learnt.size(); i++)
             if (reason(var(out_learnt[i])) == CRef_Undef || !litRedundant(out_learnt[i]))
                 out_learnt[j++] = out_learnt[i];
-        
     }else if (ccmin_mode == 1){
         for (i = j = 1; i < out_learnt.size(); i++){
             Var x = var(out_learnt[i]);
@@ -731,6 +731,7 @@ void Solver::propagate()
                     // Copy the remaining watches:
                     while (i < end) *j++ = *i++;
                     ws.shrink(i - j);
+                    assert(!propagation_queue.empty() && propagation_queue.top().first < l);
                     goto NextVariable;
                 } else {
                     continue;
@@ -749,7 +750,7 @@ void Solver::propagate()
         }
         ws.shrink(i - j);
 
-    NextVariable:
+    NextVariable:;
     }
 
     propagations += num_props;
@@ -1090,7 +1091,11 @@ lbool Solver::solve_()
     int curr_restarts = 0;
     while (status == l_Undef){
         double rest_base = luby_restart ? luby(restart_inc, curr_restarts) : pow(restart_inc, curr_restarts);
-        status = search(rest_base * restart_first);
+        try{
+            status = search(rest_base * restart_first);
+        } catch (...) {
+            status = l_False;
+        }
         if (!withinBudget()) break;
         curr_restarts++;
     }

@@ -196,7 +196,7 @@ protected:
     vec<CRef>           learnts;          // List of learnt clauses.
     vec<Lit>            trail;            // Assignment stack; stores all assigments made in the order they were made.
     vec<int>            trail_lim;        // Separator indices for different decision levels in 'trail'.
-    std::vector<vec<Lit>> trail_level = { {} };
+    vec<vec<Lit>>       trail_level;
     std::priority_queue<std::pair<int, Var>> propagation_queue;
     vec<Lit>            assumptions;      // Current set of assumptions provided to solve by the user.
 
@@ -495,7 +495,7 @@ inline bool     Solver::isRemoved       (CRef cr)         const { return ca[cr].
 inline bool     Solver::locked          (const Clause& c) const { return value(c[0]) == l_True && reason(var(c[0])) != CRef_Undef && !isReasonLazy(var(c[0])) && ca.lea(reason(var(c[0]))) == &c; }
 inline void     Solver::newDecisionLevel()                      {
     trail_lim.push(trail.size());
-    trail_level.emplace_back();
+    trail_level.push();
     if (external_propagator) {
         assert(notify_backtrack == false);
         assert(notify_assignment_index == trail.size());

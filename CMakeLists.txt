@@ -43,7 +43,8 @@ set(MINISAT_LIB_SOURCES
     minisat/utils/Options.cc
     minisat/utils/System.cc
     minisat/core/Solver.cc
-    minisat/simp/SimpSolver.cc)
+#    minisat/simp/SimpSolver.cc
+    )
 
 add_library(minisat-lib-static STATIC ${MINISAT_LIB_SOURCES})
 add_library(minisat-lib-shared SHARED ${MINISAT_LIB_SOURCES})
@@ -52,16 +53,16 @@ target_link_libraries(minisat-lib-shared ${ZLIB_LIBRARY})
 target_link_libraries(minisat-lib-static ${ZLIB_LIBRARY})
 
 add_executable(minisat_core minisat/core/Main.cc)
-add_executable(minisat_simp minisat/simp/Main.cc)
+#add_executable(minisat_simp minisat/simp/Main.cc)
 add_executable(fuzz test/fuzz.cc)
 
 if(STATIC_BINARIES)
   target_link_libraries(minisat_core minisat-lib-static)
-  target_link_libraries(minisat_simp minisat-lib-static)
+#  target_link_libraries(minisat_simp minisat-lib-static)
   target_link_libraries(fuzz minisat-lib-static)
 else()
   target_link_libraries(minisat_core minisat-lib-shared)
-  target_link_libraries(minisat_simp minisat-lib-shared)
+#  target_link_libraries(minisat_simp minisat-lib-shared)
   target_link_libraries(fuzz minisat-lib-shared)
 endif()
 
@@ -72,7 +73,7 @@ set_target_properties(minisat-lib-shared
     VERSION ${MINISAT_VERSION}
     SOVERSION ${MINISAT_SOVERSION})
 
-set_target_properties(minisat_simp       PROPERTIES OUTPUT_NAME "minisat")
+#set_target_properties(minisat_simp       PROPERTIES OUTPUT_NAME "minisat")
 
 # MiniSatUP
 set(MINISATUP_LIB_SOURCES
@@ -86,11 +87,11 @@ set_target_properties(minisatup-lib-static PROPERTIES OUTPUT_NAME "minisatup")
 #--------------------------------------------------------------------------------------------------
 # Installation targets:
 
-install(TARGETS minisat-lib-static minisat-lib-shared minisat_core minisat_simp
+install(TARGETS minisat-lib-static minisat-lib-shared minisat_core #minisat_simp
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
 
-install(DIRECTORY minisat/mtl minisat/utils minisat/core minisat/simp
+install(DIRECTORY minisat/mtl minisat/utils minisat/core #minisat/simp
         DESTINATION include/minisat
         FILES_MATCHING PATTERN "*.h")
