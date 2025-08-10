@@ -687,7 +687,7 @@ void Solver::propagate()
         Watcher *i, *j, *end;
         num_props++;
 
-        for (i = j = (Watcher*)ws, end = i + ws.size();  i != end;){
+        for (i = j = ws.get(), end = i + ws.size(); i != end;){
             // Try to avoid inspecting the clause:
             Lit blocker = i->blocker;
             if (value(blocker) == l_True && level(blocker) <= l){
@@ -741,11 +741,17 @@ void Solver::propagate()
                     if (level_max == 0) {
                         throw l_False;
                     }
+                    Watcher* ws_old = ws.get();
                     analyzeAndLearn(cr, level_max);
+
                     assert(decisionLevel() < level_max);
                     assert(!propagation_queue.empty() && propagation_queue.top().first <= decisionLevel());
-                    assert(end <= (Watcher*)ws + ws.size());
-                    end = (Watcher*)ws + ws.size();
+
+                    assert(end <= ws_old + ws.size());
+                    i = ws.get() + (i - ws_old);
+                    j = ws.get() + (j - ws_old);
+                    end = ws.get() + ws.size();
+
                     if (level_max == l) {
                         // Copy the remaining watches: (!not copied when UNSAT)
                         while (i < end) *j++ = *i++;
