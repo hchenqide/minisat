@@ -672,6 +672,10 @@ void Solver::propagate()
 
     while (!propagation_queue.empty()) {
         auto [l, v] = propagation_queue.top(); propagation_queue.pop();
+        if (value(v) == l_Undef) {
+            continue;
+        }
+
         assert(level(v) <= l);
         if (level(v) != l) {
             continue;

@@ -450,7 +450,7 @@ public:
 inline CRef Solver::reason(Var x) const { return vardata[x].reason; }
 inline bool Solver::isReasonLazy(Var x) const { return reason(x) == CRef_External; }
 
-inline int  Solver::level (Var x) const { return vardata[x].level; }
+inline int  Solver::level (Var x) const { assert(value(x) != l_Undef); return vardata[x].level; }
 inline int  Solver::level (Lit l) const { return level(var(l)); }
 
 inline void Solver::insertVarOrder(Var x) {
