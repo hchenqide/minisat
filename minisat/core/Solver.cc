@@ -264,7 +264,7 @@ void Solver::cancelUntil(int l) {
             if (level(x) <= l) {
                 trail[j++] = trail[i];
             } else{
-                assigns [x] = l_Undef;
+                assigns[x] = l_Undef;
                 if (phase_saving > 1 || (phase_saving == 1 && i > trail_lim.last()))
                     polarity[x] = sign(trail[i]);
                 insertVarOrder(x);
@@ -278,8 +278,8 @@ void Solver::cancelUntil(int l) {
         }
 
         trail.shrink(i - j);
-        trail_lim.shrink(trail_lim.size() - l);
         trail_level.shrink(trail_lim.size() - l);
+        trail_lim.shrink(trail_lim.size() - l);
     }
 }
 
@@ -366,7 +366,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
 
         for (int j = (p == lit_Undef) ? 0 : 1; j < c.size(); j++){
             Lit q = c[j];
-
+            assert(value(q) == l_False);
             if (!seen[var(q)] && level(var(q)) > 0){
                 varBumpActivity(var(q));
                 seen[var(q)] = 1;
@@ -377,7 +377,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
                     out_learnt.push(q);
             }
         }
-        
+
         // Select next clause to look at:
         for (;; j--) {
             assert(j >= 0);
@@ -392,6 +392,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         }
 
         p = current_trail[j--];
+        assert(value(p) == l_True);
         confl = reasonLazy(var(p));
         if (level(p) < analyze_level) {
             if (confl == CRef_Undef) {
@@ -399,7 +400,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
                 seen[var(p)] = 0;
             } else {
                 assert(level(p) > 0);
-                out_learnt.push(p);
+                out_learnt.push(~p);
             }
             i++;
         } else{
@@ -647,8 +648,10 @@ void Solver::reassign(Var x, CRef c, int l)
 {
     assert(value(x) != l_Undef);
     assert(level(x) > l);
+    Lit p = mkLit(x, assigns[x] == l_False);
+    assert(value(p) == l_True);
     vardata[x] = mkVarData(c, l);
-    trail_level[l].push(mkLit(x, value(x) == l_False));
+    trail_level[l].push(p);
     propagation_queue.push({l, x});
 }
 
