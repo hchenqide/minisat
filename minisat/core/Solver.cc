@@ -31,6 +31,7 @@ using namespace Minisat;
 // debug print vec<Lit>, vec<Var>
 void print_vec_lit(const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(v[i])); printf("\n"); }
 void print_vec_var(const vec<Var>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(mkLit(v[i]))); printf("\n"); }
+void print_vec_watch(const vec<Minisat::Solver::Watcher>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", v[i].cref); printf("\n"); }
 
 
 //=================================================================================================
@@ -742,6 +743,7 @@ void Solver::propagate()
                     }
                     analyzeAndLearn(cr, level_max);
                     // Copy the remaining watches: (!not copied when UNSAT)
+                    end = (Watcher*)ws + ws.size();
                     while (i < end) *j++ = *i++;
                     ws.shrink(i - j);
                     assert(!propagation_queue.empty() && propagation_queue.top().first < l);
