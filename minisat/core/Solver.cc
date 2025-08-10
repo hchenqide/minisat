@@ -742,12 +742,19 @@ void Solver::propagate()
                         throw l_False;
                     }
                     analyzeAndLearn(cr, level_max);
-                    // Copy the remaining watches: (!not copied when UNSAT)
+                    assert(decisionLevel() < level_max);
+                    assert(!propagation_queue.empty() && propagation_queue.top().first <= decisionLevel());
+                    assert(end <= (Watcher*)ws + ws.size());
                     end = (Watcher*)ws + ws.size();
-                    while (i < end) *j++ = *i++;
-                    ws.shrink(i - j);
-                    assert(!propagation_queue.empty() && propagation_queue.top().first < l);
-                    goto NextVariable;
+                    if (level_max == l) {
+                        // Copy the remaining watches: (!not copied when UNSAT)
+                        while (i < end) *j++ = *i++;
+                        ws.shrink(i - j);
+                        goto NextVariable;
+                    } else {
+                        assert(decisionLevel() >= l);
+                        continue;
+                    }
                 } else {
                     continue;
                 }
