@@ -341,7 +341,7 @@ Lit Solver::pickBranchLit()
 |        rest of literals. There may be others from the same level though.
 |  
 |________________________________________________________________________________________________@*/
-void Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt, int& out_btlevel)
+bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
 {
     int pathC = 0;
     Lit p     = lit_Undef;
@@ -387,18 +387,34 @@ void Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt, int& o
             j--;
         }
 
-        p     = current_trail[j];
+        p = current_trail[j--];
         confl = reasonLazy(var(p));
-        seen[var(p)] = 0;
+        if (level(p) < analyze_level) {
+            if (confl == CRef_Undef) {
+                assert(level(p) == 0);
+                seen[var(p)] = 0;
+            } else {
+                assert(level(p) > 0);
+                out_learnt.push(p);
+            }
+            i++;
+        } else{
+            seen[var(p)] = 0;
+        }
         pathC--;
-
     }while (pathC > 0);
-    out_learnt[0] = ~p;
 
     for (++i, ++i, ++j; i < current_trail.size(); ++i, ++j){
         current_trail[j] = current_trail[i];
     }
     current_trail.shrink(i - j);
+
+    if (level(p) < analyze_level) {
+        for (int j = 1; j < out_learnt.size(); j++) seen[var(out_learnt[j])] = 0;
+        return false;
+    }
+
+    out_learnt[0] = ~p;
 
     // Simplify conflict clause:
     //
@@ -430,24 +446,9 @@ void Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt, int& o
     out_learnt.shrink(i - j);
     tot_literals += out_learnt.size();
 
-    // Find correct backtrack level:
-    //
-    if (out_learnt.size() == 1)
-        out_btlevel = 0;
-    else{
-        int max_i = 1;
-        // Find the first literal assigned at the next-highest level:
-        for (int i = 2; i < out_learnt.size(); i++)
-            if (level(var(out_learnt[i])) > level(var(out_learnt[max_i])))
-                max_i = i;
-        // Swap-in this literal at index 1:
-        Lit p             = out_learnt[max_i];
-        out_learnt[max_i] = out_learnt[1];
-        out_learnt[1]     = p;
-        out_btlevel       = level(var(p));
-    }
-
     for (int j = 0; j < analyze_toclear.size(); j++) seen[var(analyze_toclear[j])] = 0;    // ('seen[]' is now cleared)
+
+    return true;
 }
 
 
@@ -545,13 +546,13 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
                     out_conflict.insert(~current_trail[j]);
                 } else {
                     CRef ref = reasonLazy(x);
-                    if (ref == CRef_Undef) {
-                        assert(level(x) == 0);
-                        seen[x] = 0;
-                        continue;
-                    }
                     if (level(x) < l) {
-                        assert(ref != CRef_Undef);
+                        if (ref == CRef_Undef) {
+                            assert(level(x) == 0);
+                            seen[x] = 0;
+                        } else {
+                            assert(level(x) > 0);
+                        }
                         i++;
                         continue;
                     }
@@ -573,10 +574,38 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
     seen[var(p)] = 0;
 }
 
+void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
+    conflicts++; conflictC++;
+    if (analyze_level == 0) {
+        throw; // UNSAT
+    }
+
+    vec<Lit> learnt_clause;
+    if (!analyze(confl, analyze_level, learnt_clause)) {
+        return;
+    }
+
+    // proof print learned clause
+    if (output) {
+        outputPrintClause(learnt_clause);
+    }
+
+    if (learner) {
+        for (int i = 0; i < learnt_clause.size(); i++) {
+            learner->learn(LitToint(learnt_clause[i]));
+        }
+        learner->learn(0);
+    }
+
+    add_clause_solving(learnt_clause, true);
+#error do this to the learnt clause
+    claBumpActivity(ca[cr]);
+}
 
 void Solver::uncheckedEnqueue(Lit p, CRef from)
 {
     assert(false); // chrono: use assign/reassign instead
+
     assert(value(p) == l_Undef);
     assigns[var(p)] = lbool(!sign(p));
     vardata[var(p)] = mkVarData(from, decisionLevel());
@@ -589,7 +618,7 @@ void Solver::assign(Lit p, CRef c, int l)
     assigns[var(p)] = lbool(!sign(p));
     vardata[var(p)] = mkVarData(c, l);
     trail.push_(p);
-    trail_level[l].push_(p);
+    trail_level[l].push(p);
     propagation_queue.push({l, var(p)});
 }
 
@@ -598,7 +627,7 @@ void Solver::reassign(Var x, CRef c, int l)
     assert(value(x) != l_Undef);
     assert(level(x) > l);
     vardata[x] = mkVarData(c, l);
-    trail_level[l].push_(mkLit(x, value(x) == l_False));
+    trail_level[l].push(mkLit(x, value(x) == l_False));
     propagation_queue.push({l, x});
 }
 
@@ -619,6 +648,7 @@ CRef Solver::propagate()
     int     num_props = 0;
 
     while (qhead < trail.size()){
+
         Lit            p   = trail[qhead++];     // 'p' is enqueued fact to propagate.
         vec<Watcher>&  ws  = watches.lookup(p);
         Watcher        *i, *j, *end;
@@ -826,9 +856,7 @@ bool Solver::simplify()
 lbool Solver::search(int nof_conflicts)
 {
     assert(ok);
-    int         backtrack_level;
-    int         conflictC = 0;
-    vec<Lit>    learnt_clause;
+    conflictC = 0;
     starts++;
 
     for (;;){
@@ -836,45 +864,8 @@ lbool Solver::search(int nof_conflicts)
         CRef confl = propagate();
     analyze:
         if (confl != CRef_Undef){
-            // CONFLICT
-            conflicts++; conflictC++;
-            if (decisionLevel() == 0) return l_False;
 
-            learnt_clause.clear();
-            // unit clauses that are added lazily will throw this unit as exception and break analyze
-            try {
-                analyze(confl, learnt_clause, backtrack_level);
-            } catch (std::tuple<int, Lit, CRef> t) {
-                for (int i = 0; i < analyze_toclear.size(); i++) seen[var(analyze_toclear[i])] = 0;
-                auto [level, lit, c] = t;
-                cancelUntil(level);
-                uncheckedEnqueue(lit, c);
-                continue;
-            }
 
-            if (learner) {
-                for (int i = 0; i < learnt_clause.size(); i++) {
-                    learner->learn(LitToint(learnt_clause[i]));
-                }
-                learner->learn(0);
-            }
-
-            cancelUntil(backtrack_level);
-
-            if (learnt_clause.size() == 1){
-                uncheckedEnqueue(learnt_clause[0]);
-            }else{
-                CRef cr = ca.alloc(learnt_clause, true);
-                learnts.push(cr);
-                attachClause(cr);
-                claBumpActivity(ca[cr]);
-                uncheckedEnqueue(learnt_clause[0], cr);
-            }
-
-            // proof print learned clause
-            if (output) {
-                outputPrintClause(learnt_clause);
-            }
 
             varDecayActivity();
             claDecayActivity();
