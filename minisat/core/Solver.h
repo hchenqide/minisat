@@ -72,8 +72,6 @@ public:
     bool    solve        (Lit p, Lit q, Lit r);     // Search for a model that respects three assumptions.
     bool    okay         () const;                  // FALSE means solver is in a conflicting state
 
-    bool    implies      (const vec<Lit>& assumps, vec<Lit>& out);
-
     // Iterate over clauses and top-level assignments:
     ClauseIterator clausesBegin() const;
     ClauseIterator clausesEnd()   const;
@@ -216,7 +214,6 @@ protected:
     bool                ok;               // If FALSE, the constraints are already unsatisfiable. No part of the solver state may be used!
     double              cla_inc;          // Amount to bump next clause with.
     double              var_inc;          // Amount to bump next variable with.
-    // int                 qhead;            // Head of queue (as index into the trail -- no more explicit propagation queue in MiniSat).
     int                 simpDB_assigns;   // Number of top-level assignments since last execution of 'simplify()'.
     int64_t             simpDB_props;     // Remaining number of propagations that must be made before next execution of 'simplify()'.
     double              progress_estimate;// Set by 'search()'.
@@ -254,7 +251,7 @@ protected:
     bool     enqueue          (Lit p, CRef from = CRef_Undef);                         // Test if fact 'p' contradicts current state, enqueue otherwise.
     void     assign           (Lit p, CRef c, int level);
     void     reassign         (Var x, CRef c, int level);
-    CRef     propagate        ();                                                      // Perform unit propagation. Returns possibly conflicting clause.
+    void     propagate        ();                                                      // Perform propagation.
     void     cancelUntil      (int level);                                             // Backtrack until a certain level.
     bool     analyze          (CRef confl, int analyze_level, vec<Lit>& out_learnt);
     void     analyzeFinal     (Lit p, LSet& out_conflict);                             // COULD THIS BE IMPLEMENTED BY THE ORDINARIY "analyze" BY SOME REASONABLE GENERALIZATION?

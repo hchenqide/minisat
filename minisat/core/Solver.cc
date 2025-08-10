@@ -95,7 +95,6 @@ Solver::Solver() :
   , ok                 (true)
   , cla_inc            (1)
   , var_inc            (1)
-//   , qhead              (0)
   , simpDB_assigns     (-1)
   , simpDB_props       (0)
   , progress_estimate  (0)
@@ -141,7 +140,6 @@ Var Solver::newVar(lbool upol, bool dvar)
     user_pol .insert(v, upol);
     decision .reserve(v);
     trail    .capacity(v+1);
-// Chenqi: there's no need to reserve space for decision and trail, if it's going to be unsat
     setDecisionVar(v, dvar);
     return v;
 }
@@ -190,7 +188,11 @@ bool Solver::addClause_(vec<Lit>& ps)
         return ok = false;
     else if (ps.size() == 1){
         assign(ps[0], CRef_Undef, 0);
-        return ok = (propagate() == CRef_Undef);
+        try{
+            propagate();
+        } catch(...){
+            return ok = false;
+        }
     }else{
         CRef cr = ca.alloc(ps, false);
         clauses.push(cr);
@@ -658,22 +660,26 @@ void Solver::reassign(Var x, CRef c, int l)
 |    Post-conditions:
 |      * the propagation queue is empty, even if there was a conflict.
 |________________________________________________________________________________________________@*/
-CRef Solver::propagate()
+void Solver::propagate()
 {
-    CRef    confl     = CRef_Undef;
     int     num_props = 0;
 
-    while (qhead < trail.size()){
+    while (!propagation_queue.empty()) {
+        auto [l, v] = propagation_queue.top(); propagation_queue.pop();
+        assert(level(v) <= l);
+        if (level(v) != l) {
+            continue;
+        }
 
-        Lit            p   = trail[qhead++];     // 'p' is enqueued fact to propagate.
-        vec<Watcher>&  ws  = watches.lookup(p);
-        Watcher        *i, *j, *end;
+        Lit p = mkLit(v, assigns[v] == l_False);
+        vec<Watcher>& ws = watches.lookup(p);
+        Watcher *i, *j, *end;
         num_props++;
 
         for (i = j = (Watcher*)ws, end = i + ws.size();  i != end;){
             // Try to avoid inspecting the clause:
             Lit blocker = i->blocker;
-            if (value(blocker) == l_True){
+            if (value(blocker) == l_True && level(blocker) <= l){
                 *j++ = *i++; continue; }
 
             // Make sure the false literal is data[1]:
@@ -688,35 +694,66 @@ CRef Solver::propagate()
             // If 0th watch is true, then clause is already satisfied.
             Lit     first = c[0];
             Watcher w     = Watcher(cr, first);
-            if (first != blocker && value(first) == l_True){
-                *j++ = w; continue; }
+            if (first != blocker && value(first) == l_True && level(first) <= l) {
+                *j++ = w; 
+                continue; 
+            }
 
             // Look for new watch:
+            int k_max = 1;
+            int level_max = l;
             for (int k = 2; k < c.size(); k++)
                 if (value(c[k]) != l_False){
                     c[1] = c[k]; c[k] = false_lit;
                     watches[~c[1]].push(w);
-                    goto NextClause; }
+                    goto NextClause;
+                } else {
+                    int level_curr = level(c[k]);
+                    if (level_curr > level_max) {
+                        level_max = level_curr;
+                        k_max = k;
+                    }
+                }
 
-            // Did not find watch -- clause is unit under assignment:
-            *j++ = w;
-            if (value(first) == l_False){
-                confl = cr;
-                qhead = trail.size();
-                // Copy the remaining watches:
-                while (i < end)
-                    *j++ = *i++;
-            }else
-                uncheckedEnqueue(first, cr);
+            if (k_max != 1) {
+                c[1] = c[k_max]; c[k_max] = false_lit;
+                watches[~c[1]].push(w);
+            } else {
+                *j++ = w;
+            }
 
+            if (value(first) == l_False) {
+                if (level(first) > level_max) {
+                    cancelUntil(level(first) - 1);
+                    assign(first, cr, level_max);
+                } else if (level(first) == level_max) {
+                    analyzeAndLearn(cr, level_max);
+                    // Copy the remaining watches:
+                    while (i < end) *j++ = *i++;
+                    ws.shrink(i - j);
+                    goto NextVariable;
+                } else {
+                    continue;
+                }
+            } else if (value(first) == l_True) {
+                if (level(first) <= level_max) {
+                    continue;
+                } else {
+                    reassign(var(first), cr, level_max);
+                }
+            } else {
+                assert(value(first) == l_Undef);
+                assign(first, cr, level_max);
+            }
         NextClause:;
         }
         ws.shrink(i - j);
+
+    NextVariable:
     }
+
     propagations += num_props;
     simpDB_props -= num_props;
-
-    return confl;
 }
 
 
@@ -812,8 +849,15 @@ bool Solver::simplify()
 {
     assert(decisionLevel() == 0);
 
-    if (!ok || propagate() != CRef_Undef)
+    if (!ok) {
+        return false;
+    }
+
+    try {
+        propagate();
+    } catch (...) {
         return ok = false;
+    }
 
     if (nAssigns() == simpDB_assigns || (simpDB_props > 0))
         return true;
@@ -836,8 +880,6 @@ bool Solver::simplify()
             if (seen[var(trail[i])] == 0)
                 trail[j++] = trail[i];
         trail.shrink(i - j);
-        //printf("trail.size()= %d, qhead = %d\n", trail.size(), qhead);
-        qhead = trail.size();
 
         for (int i = 0; i < released_vars.size(); i++)
             seen[released_vars[i]] = 0;
@@ -961,12 +1003,6 @@ lbool Solver::search(int nof_conflicts)
             decisions++;
             next = pickBranchLit();
 
-            // next == lit_Undef <-> trail.size() == nVars() -> order_heap.empty()
-            assert(trail.size() <= nVars());
-            assert(next != lit_Undef || trail.size() == nVars());
-            assert(trail.size() < nVars() || next == lit_Undef);
-            assert(next != lit_Undef || order_heap.empty());
-
             if (next == lit_Undef) {
                 if (external_propagator && !external_propagator->cb_check_found_model(getCurrentModel())) {
                     continue;
@@ -1074,32 +1110,6 @@ lbool Solver::solve_()
     return status;
 }
 
-
-bool Solver::implies(const vec<Lit>& assumps, vec<Lit>& out)
-{
-    trail_lim.push(trail.size());
-    for (int i = 0; i < assumps.size(); i++){
-        Lit a = assumps[i];
-
-        if (value(a) == l_False){
-            cancelUntil(0);
-            return false;
-        }else if (value(a) == l_Undef)
-            uncheckedEnqueue(a);
-    }
-
-    unsigned trail_before = trail.size();
-    bool     ret          = true;
-    if (propagate() == CRef_Undef){
-        out.clear();
-        for (int j = trail_before; j < trail.size(); j++)
-            out.push(trail[j]);
-    }else
-        ret = false;
-    
-    cancelUntil(0);
-    return ret;
-}
 
 //=================================================================================================
 // Writing CNF to DIMACS:
