@@ -189,7 +189,7 @@ bool Solver::addClause_(vec<Lit>& ps)
     if (ps.size() == 0)
         return ok = false;
     else if (ps.size() == 1){
-        uncheckedEnqueue(ps[0]);
+        assign(ps[0], CRef_Undef, 0);
         return ok = (propagate() == CRef_Undef);
     }else{
         CRef cr = ca.alloc(ps, false);
@@ -255,7 +255,7 @@ bool Solver::satisfied(const Clause& c) const {
 void Solver::cancelUntil(int l) {
     if (decisionLevel() > l){
         int i, j;
-        for (i = j = trail_lim[l] + 1; i < trail.size(); ++i) {
+        for (i = j = trail_lim[l]; i < trail.size(); ++i) {
             Var x = var(trail[i]);
             if (level(x) <= l) {
                 trail[j++] = trail[i];
@@ -266,15 +266,16 @@ void Solver::cancelUntil(int l) {
                 insertVarOrder(x);
             }
         }
+
+        if (external_propagator) {
+            assert(notify_assignment_index >= trail_lim[l]);
+            notify_assignment_index = trail_lim[l];
+            notify_backtrack = true;
+        }
+
         trail.shrink(i - j);
         trail_lim.shrink(trail_lim.size() - l);
         trail_level.resize(l + 1);
-
-        if (external_propagator) {
-            assert(notify_assignment_index >= trail.size());
-            notify_assignment_index = trail.size();
-            notify_backtrack = true;
-        }
     }
 }
 
@@ -374,7 +375,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         }
         
         // Select next clause to look at:
-        while(true) {
+        for (;; j--) {
             assert(j >= 0);
             Var v = var(current_trail[j]);
             assert(level(v) <= analyze_level);
@@ -384,7 +385,6 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
                     break;
                 }
             }
-            j--;
         }
 
         p = current_trail[j--];
@@ -576,14 +576,15 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
 
 void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
     conflicts++; conflictC++;
-    if (analyze_level == 0) {
-        throw; // UNSAT
-    }
+
+    assert(analyze_level > 0);
 
     vec<Lit> learnt_clause;
     if (!analyze(confl, analyze_level, learnt_clause)) {
         return;
     }
+
+    assert([&]() { for (int i = 0; i < learnt_clause.size(); i++) { assert(value(learnt_clause[i]) == l_False); } return true; }());
 
     // proof print learned clause
     if (output) {
@@ -597,9 +598,24 @@ void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
         learner->learn(0);
     }
 
-    add_clause_solving(learnt_clause, true);
-#error do this to the learnt clause
+    CRef cr = add_clause_solving(learnt_clause, true);
+    assert(cr != CRef_Undef);
     claBumpActivity(ca[cr]);
+
+    varDecayActivity();
+    claDecayActivity();
+
+    if (--learntsize_adjust_cnt == 0){
+        learntsize_adjust_confl *= learntsize_adjust_inc;
+        learntsize_adjust_cnt    = (int)learntsize_adjust_confl;
+        max_learnts             *= learntsize_inc;
+
+        if (verbosity >= 1)
+            printf("| %9d | %7d %8d %8d | %8d %8d %6.0f | %6.3f %% |\n", 
+                    (int)conflicts, 
+                    (int)dec_vars - (trail_lim.size() == 0 ? trail.size() : trail_lim[0]), nClauses(), (int)clauses_literals, 
+                    (int)max_learnts, nLearnts(), (double)learnts_literals/nLearnts(), progressEstimate()*100);
+    }
 }
 
 void Solver::uncheckedEnqueue(Lit p, CRef from)
@@ -860,154 +876,110 @@ lbool Solver::search(int nof_conflicts)
     starts++;
 
     for (;;){
-    propagate:
-        CRef confl = propagate();
-    analyze:
-        if (confl != CRef_Undef){
+        propagate();
 
+        // NO CONFLICT
+        if ((nof_conflicts >= 0 && conflictC >= nof_conflicts) || !withinBudget()){
+            // Reached bound on number of conflicts:
+            progress_estimate = progressEstimate();
+            cancelUntil(0);
+            return l_Undef; }
 
+        // Simplify the set of problem clauses:
+        if (decisionLevel() == 0 && !simplify())
+            return l_False;
 
-            varDecayActivity();
-            claDecayActivity();
+        if (learnts.size()-nAssigns() >= max_learnts)
+            // Reduce the set of learnt clauses:
+            reduceDB();
 
-            if (--learntsize_adjust_cnt == 0){
-                learntsize_adjust_confl *= learntsize_adjust_inc;
-                learntsize_adjust_cnt    = (int)learntsize_adjust_confl;
-                max_learnts             *= learntsize_inc;
-
-                if (verbosity >= 1)
-                    printf("| %9d | %7d %8d %8d | %8d %8d %6.0f | %6.3f %% |\n", 
-                           (int)conflicts, 
-                           (int)dec_vars - (trail_lim.size() == 0 ? trail.size() : trail_lim[0]), nClauses(), (int)clauses_literals, 
-                           (int)max_learnts, nLearnts(), (double)learnts_literals/nLearnts(), progressEstimate()*100);
+        if (external_propagator) {
+            // notify external propagator of backtrack and assignment
+            if (notify_backtrack) {
+                external_propagator->notify_backtrack(decisionLevel());
+                notify_backtrack = false;
+            }
+            if (notify_assignment_index < trail.size()) {
+                std::vector<int> new_assignments; new_assignments.reserve(trail.size() - notify_assignment_index);
+                while(notify_assignment_index < trail.size()) {
+                    new_assignments.push_back(LitToint(trail[notify_assignment_index++]));
+                }
+                external_propagator->notify_assignment(new_assignments);
             }
 
-        }else{
-            // NO CONFLICT
-            if ((nof_conflicts >= 0 && conflictC >= nof_conflicts) || !withinBudget()){
-                // Reached bound on number of conflicts:
-                progress_estimate = progressEstimate();
-                cancelUntil(0);
-                return l_Undef; }
-
-            // Simplify the set of problem clauses:
-            if (decisionLevel() == 0 && !simplify())
-                return l_False;
-
-            if (learnts.size()-nAssigns() >= max_learnts)
-                // Reduce the set of learnt clauses:
-                reduceDB();
-
-            if (external_propagator) {
-                // notify external propagator of backtrack and assignment
-                if (notify_backtrack) {
-                    external_propagator->notify_backtrack(decisionLevel());
-                    notify_backtrack = false;
-                }
-                if (notify_assignment_index < trail.size()) {
-                    std::vector<int> new_assignments; new_assignments.reserve(trail.size() - notify_assignment_index);
-                    while(notify_assignment_index < trail.size()) {
-                        new_assignments.push_back(LitToint(trail[notify_assignment_index++]));
-                    }
-                    external_propagator->notify_assignment(new_assignments);
-                }
-
-                // request external units 
-                while (true) {
-                    int lit = external_propagator->cb_propagate();
-                    if (lit == 0) { break; }
-                    Lit l = intToLit(lit);
-                    if (value(l) == l_True) {
-                        continue;
-                    }
-                    if (value(l) == l_False) {
-                        external_get_reason(l, add_tmp);
-                        bool prop = false;
-                        bool unsat = add_clause_solving(add_tmp, true, confl, prop);
-                        if (unsat) {
-                            return l_False;
-                        }
-                        if (prop) {
-                            goto propagate;
-                        }
-                        if (confl != CRef_Undef) {
-                            goto analyze;
-                        }
-                        assert(false);
-                    }
-                    assert(value(l) == l_Undef);
-                    uncheckedEnqueue(l, decisionLevel() == 0? CRef_Undef : CRef_External);
-                    notify_assignment_index++; external_propagator->notify_assignment({lit});  // notify immediately to fuzzer for keeping unit_clause_map
-                    goto propagate;
-                }
-
-                // request external clause
-                bool is_forgettable;
-                while (external_propagator->cb_has_external_clause(is_forgettable)) {
-                    add_tmp.clear();
-                    int lit;
-                    while (lit = external_propagator->cb_add_external_clause_lit()){
-                        add_tmp.push(intToLit(lit));
-                    }
-                    bool prop = false;
-                    bool unsat = add_clause_solving(add_tmp, is_forgettable, confl, prop);
-                    if (unsat) {
-                        return l_False;
-                    }
-                    if (prop) {
-                        goto propagate;
-                    }
-                    if (confl != CRef_Undef) {
-                        goto analyze;
-                    }
-                }
-            }
-
-            Lit next = lit_Undef;
-            while (decisionLevel() < assumptions.size()){
-                // Perform user provided assumption:
-                Lit p = assumptions[decisionLevel()];
-                if (value(p) == l_True){
-                    // remove true literals from assumptions until the next false literal, shifting the following ones
-                    int curr = decisionLevel(), next = curr + 1;
-                    while (next < assumptions.size() && value(assumptions[next]) == l_True) { next++; }
-                    while (next < assumptions.size()) { assumptions[curr++] = assumptions[next++]; }
-                    assumptions.shrink(next - curr);
+            // request external units
+            while (int lit = external_propagator->cb_propagate()) {
+                Lit l = intToLit(lit);
+                if (value(l) == l_True) {
                     continue;
-                }else if (value(p) == l_False){
-                    analyzeFinal(~p, conflict);
-                    return l_False;
-                }else{
-                    next = p;
-                    break;
                 }
+                if (value(l) == l_False) {
+                    external_get_reason(l, add_tmp);
+                    add_clause_solving(add_tmp, true);
+                    continue;
+                }
+                assert(value(l) == l_Undef);
+                assign(l, decisionLevel() == 0? CRef_Undef : CRef_External, decisionLevel());
+
+                notify_assignment_index++; external_propagator->notify_assignment({lit});  // notify immediately to fuzzer for keeping unit_clause_map
             }
 
-            if (next == lit_Undef){
-                // New variable decision:
-                decisions++;
-                next = pickBranchLit();
-
-                // next == lit_Undef <-> trail.size() == nVars() -> order_heap.empty()
-                assert(trail.size() <= nVars());
-                assert(next != lit_Undef || trail.size() == nVars());
-                assert(trail.size() < nVars() || next == lit_Undef);
-                assert(next != lit_Undef || order_heap.empty());
-
-                if (next == lit_Undef) {
-                    if (external_propagator && !external_propagator->cb_check_found_model(getCurrentModel())) {
-                        continue;
-                    }
-
-                    // Model found:
-                    return l_True;
-                }
+            // request external clause
+            bool is_forgettable;
+            while (external_propagator->cb_has_external_clause(is_forgettable)) {
+                external_get_clause(add_tmp);
+                add_clause_solving(add_tmp, is_forgettable);
             }
 
-            // Increase decision level and enqueue 'next'
-            newDecisionLevel();
-            uncheckedEnqueue(next);
+            if (!propagation_queue.empty()) {
+                continue;
+            }
         }
+
+        Lit next = lit_Undef;
+        while (decisionLevel() < assumptions.size()){
+            // Perform user provided assumption:
+            Lit p = assumptions[decisionLevel()];
+            if (value(p) == l_True){
+                // remove true literals from assumptions until the next false literal, shifting the following ones
+                int curr = decisionLevel(), next = curr + 1;
+                while (next < assumptions.size() && value(assumptions[next]) == l_True) { next++; }
+                while (next < assumptions.size()) { assumptions[curr++] = assumptions[next++]; }
+                assumptions.shrink(next - curr);
+                continue;
+            }else if (value(p) == l_False){
+                analyzeFinal(~p, conflict);
+                return l_False;
+            }else{
+                next = p;
+                break;
+            }
+        }
+
+        if (next == lit_Undef){
+            // New variable decision:
+            decisions++;
+            next = pickBranchLit();
+
+            // next == lit_Undef <-> trail.size() == nVars() -> order_heap.empty()
+            assert(trail.size() <= nVars());
+            assert(next != lit_Undef || trail.size() == nVars());
+            assert(trail.size() < nVars() || next == lit_Undef);
+            assert(next != lit_Undef || order_heap.empty());
+
+            if (next == lit_Undef) {
+                if (external_propagator && !external_propagator->cb_check_found_model(getCurrentModel())) {
+                    continue;
+                }
+
+                // Model found:
+                return l_True;
+            }
+        }
+
+        // Increase decision level and enqueue 'next'
+        newDecisionLevel();
+        assign(next, CRef_Undef, decisionLevel());
     }
 }
 
@@ -1309,11 +1281,11 @@ void Solver::sort_clause_solving(vec<Lit>& ps) {
     });
 }
 
-bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, bool& propagate) {
+CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
     // empty clause
     if (ps.size() == 0) {
         ipasirup_stats.unsat++;
-        return true;
+        throw; // UNSAT
     }
 
     // proof keep original clause for output
@@ -1335,10 +1307,10 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
     for (i = 0; i < ps.size() - 1; i++) {
         if (ps[i] == ~ps[i+1]) {
             ipasirup_stats.skipped++;
-            return false;
+            return CRef_Undef;
         }
     }
-    
+
     // sort by level and assignment
     // true(low level - high level) - unassigned - false(high level - low level)
     sort_clause_solving(ps);
@@ -1354,13 +1326,13 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
     // empty
     if (ps.size() == 0) {
         ipasirup_stats.unsat++;
-        return true;
+        throw; // UNSAT
     }
 
     // contains 0-true literals
     if (value(ps[0]) == l_True && level(ps[0]) == 0) {
         ipasirup_stats.skipped++;
-        return false;
+        return CRef_Undef;
     }
 
     // proof output
@@ -1374,10 +1346,19 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
     // unit
     if (ps.size() == 1) {
         ipasirup_stats.unit++;
-        cancelUntil(0);
-        uncheckedEnqueue(ps[0]);
-        propagate = true;
-        return false;
+        Lit a = ps[0];
+        if (value(a) == l_Undef) {
+            assign(a, CRef_Undef, 0);
+        } else {
+            assert(level(a) > 0);
+            if (value(a) == l_True) {
+                reassign(var(a), CRef_Undef, 0);
+            } else{
+                cancelUntil(level(a) - 1);
+                assign(a, CRef_Undef, 0);
+            }
+        }
+        return CRef_Undef;
     }
 
     ipasirup_stats.watched++;
@@ -1393,29 +1374,21 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
         if (level(a) == level(b)) {
             assert(a < b);
             ipasirup_stats.ff_conf++;
-            cancelUntil(level(a));
-            conflict = cr;
-            return false;
+            analyzeAndLearn(cr, level(a));
         } else {
             assert(level(a) > level(b));
             ipasirup_stats.ff_prop++;
-            cancelUntil(level(b));
-            uncheckedEnqueue(a, cr);
-            propagate = true;
-            return false;
+            cancelUntil(level(a) - 1);
+            assign(a, cr, level(b));
         }
     } else if (value(a) == l_Undef) {
         if (value(b) == l_False) {
             ipasirup_stats.uf++;
-            cancelUntil(level(b));
-            uncheckedEnqueue(a, cr);
-            propagate = true;
-            return false;
+            assign(a, cr, level(b));
         } else {
             assert(value(b) == l_Undef);
             assert(a < b);
             ipasirup_stats.uu++;
-            return false;
         }
     } else {
         assert(value(a) == l_True);
@@ -1423,13 +1396,9 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
             ipasirup_stats.tf++;
             if (level(a) > level(b)) {
                 ipasirup_stats.tf_prop++;
-                cancelUntil(level(b));
-                uncheckedEnqueue(a, cr);
-                propagate = true;
-                return false;
+                reassign(var(a), cr, level(b));
             } else {
                 ipasirup_stats.tf_unprop++;
-                return false;
             }
         } else if (value(b) == l_Undef) {
             ipasirup_stats.tu++;
@@ -1438,10 +1407,16 @@ bool Solver::add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, 
             assert(value(b) == l_True);
             assert(level(a) < level(b) || (level(a) == level(b) && a < b));
             ipasirup_stats.tt++;
-            return false;
         }
     }
-    assert(false);
+    return cr;
+}
+
+void Solver::external_get_clause(vec<Lit>& ps) {
+    ps.clear();
+    while (int lit = external_propagator->cb_add_external_clause_lit()){
+        ps.push(intToLit(lit));
+    }
 }
 
 void Solver::external_get_reason(Lit lit, vec<Lit>& ps) {

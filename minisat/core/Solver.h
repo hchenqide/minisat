@@ -362,11 +362,12 @@ private:
     bool notify_backtrack = false;
 private:
     std::vector<int> getCurrentModel();
+    void external_get_clause(vec<Lit> &ps);
     void external_get_reason(Lit lit, vec<Lit>& ps);
 private:
     int calculate_lit_sort_index(Lit lit);
     void sort_clause_solving(vec<Lit>& ps);
-    bool add_clause_solving(vec<Lit>& ps, bool forgettable, CRef& conflict, bool& propagate);
+    CRef add_clause_solving(vec<Lit>& ps, bool forgettable);
     CRef add_clause_lazy(Lit lit, vec<Lit>& ps);
 
 public:
