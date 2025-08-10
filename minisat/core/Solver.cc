@@ -95,7 +95,7 @@ Solver::Solver() :
   , ok                 (true)
   , cla_inc            (1)
   , var_inc            (1)
-  , qhead              (0)
+//   , qhead              (0)
   , simpDB_assigns     (-1)
   , simpDB_props       (0)
   , progress_estimate  (0)
@@ -252,17 +252,23 @@ bool Solver::satisfied(const Clause& c) const {
 
 // Revert to the state at given level (keeping all assignment at 'level' but not beyond).
 //
-void Solver::cancelUntil(int level) {
-    if (decisionLevel() > level){
-        for (int c = trail.size()-1; c >= trail_lim[level]; c--){
-            Var      x  = var(trail[c]);
-            assigns [x] = l_Undef;
-            if (phase_saving > 1 || (phase_saving == 1 && c > trail_lim.last()))
-                polarity[x] = sign(trail[c]);
-            insertVarOrder(x); }
-        qhead = trail_lim[level];
-        trail.shrink(trail.size() - trail_lim[level]);
-        trail_lim.shrink(trail_lim.size() - level);
+void Solver::cancelUntil(int l) {
+    if (decisionLevel() > l){
+        int i, j;
+        for (i = j = trail_lim[l] + 1; i < trail.size(); ++i) {
+            Var x = var(trail[i]);
+            if (level(x) <= l) {
+                trail[j++] = trail[i];
+            } else{
+                assigns [x] = l_Undef;
+                if (phase_saving > 1 || (phase_saving == 1 && i > trail_lim.last()))
+                    polarity[x] = sign(trail[i]);
+                insertVarOrder(x);
+            }
+        }
+        trail.shrink(i - j);
+        trail_lim.shrink(trail_lim.size() - l);
+        trail_level.resize(l + 1);
 
         if (external_propagator) {
             assert(notify_assignment_index >= trail.size());
@@ -335,7 +341,7 @@ Lit Solver::pickBranchLit()
 |        rest of literals. There may be others from the same level though.
 |  
 |________________________________________________________________________________________________@*/
-void Solver::analyze(CRef confl, vec<Lit>& out_learnt, int& out_btlevel)
+void Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt, int& out_btlevel)
 {
     int pathC = 0;
     Lit p     = lit_Undef;
@@ -358,8 +364,8 @@ void Solver::analyze(CRef confl, vec<Lit>& out_learnt, int& out_btlevel)
             if (!seen[var(q)] && level(var(q)) > 0){
                 varBumpActivity(var(q));
                 seen[var(q)] = 1;
-                analyze_toclear.push(q);
-                if (level(var(q)) >= decisionLevel())
+                assert(level(var(q)) <= analyze_level);
+                if (level(var(q)) == analyze_level)
                     pathC++;
                 else
                     out_learnt.push(q);
@@ -540,12 +546,31 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
 
 void Solver::uncheckedEnqueue(Lit p, CRef from)
 {
+    assert(false); // chrono: use assign/reassign instead
     assert(value(p) == l_Undef);
     assigns[var(p)] = lbool(!sign(p));
     vardata[var(p)] = mkVarData(from, decisionLevel());
     trail.push_(p);
 }
 
+void Solver::assign(Lit p, CRef c, int l)
+{
+    assert(value(p) == l_Undef);
+    assigns[var(p)] = lbool(!sign(p));
+    vardata[var(p)] = mkVarData(c, l);
+    trail.push_(p);
+    trail_level[l].push_(p);
+    propagation_queue.push({l, var(p)});
+}
+
+void Solver::reassign(Var x, CRef c, int l)
+{
+    assert(value(x) != l_Undef);
+    assert(level(x) > l);
+    vardata[x] = mkVarData(c, l);
+    trail_level[l].push_(mkLit(x, value(x) == l_False));
+    propagation_queue.push({l, x});
+}
 
 /*_________________________________________________________________________________________________
 |
@@ -1476,7 +1501,8 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
         Lit a = ps[0];
         assert(a == lit);
         assert(value(a) == l_True);
-        throw std::tuple<int, Lit, CRef>(0, a, CRef_Undef);
+        reassign(var(a), CRef_Undef, 0);
+        return CRef_Undef;
     }
 
     Lit a = ps[0], b = ps[1];
@@ -1490,7 +1516,7 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     attachClause(cr);
 
     if (level(a) > level(b)) {
-        throw std::tuple<int, Lit, CRef>(level(b), a, cr);
+        reassign(var(a), cr, level(b));
     }
 
     return cr;
