@@ -737,8 +737,11 @@ void Solver::propagate()
                     cancelUntil(level(first) - 1);
                     assign(first, cr, level_max);
                 } else if (level(first) == level_max) {
+                    if (level_max == 0) {
+                        throw l_False;
+                    }
                     analyzeAndLearn(cr, level_max);
-                    // Copy the remaining watches:
+                    // Copy the remaining watches: (!not copied when UNSAT)
                     while (i < end) *j++ = *i++;
                     ws.shrink(i - j);
                     assert(!propagation_queue.empty() && propagation_queue.top().first < l);
@@ -1310,7 +1313,7 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
     // empty clause
     if (ps.size() == 0) {
         ipasirup_stats.unsat++;
-        throw; // UNSAT
+        throw l_False; // UNSAT
     }
 
     // proof keep original clause for output
@@ -1351,7 +1354,7 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
     // empty
     if (ps.size() == 0) {
         ipasirup_stats.unsat++;
-        throw; // UNSAT
+        throw l_False; // UNSAT
     }
 
     // contains 0-true literals
