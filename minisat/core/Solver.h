@@ -197,7 +197,7 @@ protected:
     vec<Lit>            trail;            // Assignment stack; stores all assigments made in the order they were made.
     vec<int>            trail_lim;        // Separator indices for different decision levels in 'trail'.
     vec<vec<Lit>>       trail_level;
-    std::priority_queue<std::pair<int, Var>> propagation_queue;
+    std::priority_queue<std::pair<int, Var>, std::vector<std::pair<int, Var>>, std::greater<std::pair<int, Var>>> propagation_queue;
     vec<Lit>            assumptions;      // Current set of assumptions provided to solve by the user.
 
     VMap<double>        activity;         // A heuristic measurement of the activity of a variable.

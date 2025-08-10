@@ -601,8 +601,11 @@ void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
     }
 
     CRef cr = add_clause_solving(learnt_clause, true);
-    assert(cr != CRef_Undef);
-    claBumpActivity(ca[cr]);
+    if (cr == CRef_Undef) {
+        assert(learnt_clause.size() == 1);
+    } else {
+        claBumpActivity(ca[cr]);
+    }
 
     varDecayActivity();
     claDecayActivity();
