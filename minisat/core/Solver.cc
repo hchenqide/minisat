@@ -380,35 +380,40 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         }
 
         // Select next clause to look at:
-        for (;; j--) {
-            assert(j >= 0);
-            Var v = var(current_trail[j]);
-            assert(level(v) <= analyze_level);
-            if (level(v) == analyze_level) {
-                current_trail[i--] = current_trail[j];
-                if (seen[v]) {
-                    break;
+        do {
+            for (;; j--) {
+                assert(j >= 0);
+                Var v = var(current_trail[j]);
+                assert(level(v) <= analyze_level);
+                if (level(v) == analyze_level) {
+                    current_trail[i--] = current_trail[j];
+                    if (seen[v]) {
+                        break;
+                    }
                 }
             }
-        }
 
-        p = current_trail[j--];
-        assert(value(p) == l_True);
-        confl = reasonLazy(var(p));
-        if (level(p) < analyze_level) {
-            if (confl == CRef_Undef) {
-                assert(level(p) == 0);
-                seen[var(p)] = 0;
+            p = current_trail[j--];
+            assert(value(p) == l_True);
+            confl = reasonLazy(var(p));
+            if (level(p) < analyze_level) {
+                if (confl == CRef_Undef) {
+                    assert(level(p) == 0);
+                    seen[var(p)] = 0;
+                } else {
+                    assert(level(p) > 0);
+                    out_learnt.push(~p);
+                }
+                i++;
+                pathC--;
+                continue;
             } else {
-                assert(level(p) > 0);
-                out_learnt.push(~p);
+                seen[var(p)] = 0;
+                pathC--;
+                break;
             }
-            i++;
-        } else{
-            seen[var(p)] = 0;
-        }
-        pathC--;
-    }while (pathC > 0);
+        } while (pathC > 0);
+    } while (pathC > 0);
 
     for (++i, ++i, ++j; i < current_trail.size(); ++i, ++j){
         current_trail[j] = current_trail[i];
