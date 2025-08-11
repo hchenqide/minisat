@@ -668,6 +668,10 @@ void Solver::assign(Lit p, CRef c, int l)
     trail.push_(p);
     trail_level[l].push(p);
     propagation_queue.push({l, var(p)});
+
+    if (l == 0 && fixed_listener) {
+        fixed_listener->notify_fixed_assignment(LitToint(p));
+    }
 }
 
 void Solver::reassign(Var x, CRef c, int l)
@@ -679,6 +683,10 @@ void Solver::reassign(Var x, CRef c, int l)
     vardata[x] = mkVarData(c, l);
     trail_level[l].push(p);
     propagation_queue.push({l, x});
+
+    if (l == 0 && fixed_listener) {
+        fixed_listener->notify_fixed_assignment(LitToint(p));
+    }
 }
 
 /*_________________________________________________________________________________________________

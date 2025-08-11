@@ -116,5 +116,6 @@ int Solver::fixed(int lit) const { return data->solver.fixed(lit); }
 bool Solver::trace_proof(const char *path) { return data->solver.trace_proof(path); }
 void Solver::connect_terminator(MiniSatUP::Terminator *terminator) { return data->solver.connect_terminator(terminator); }
 void Solver::connect_learner(MiniSatUP::Learner *learner) { return data->solver.connect_learner(learner); }
+void Solver::connect_fixed_listener(FixedAssignmentListener *fixed_listener) { return data->solver.connect_fixed_listener(fixed_listener); }
 
 } // namespace MiniSatUP

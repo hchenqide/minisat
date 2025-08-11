@@ -54,7 +54,7 @@ public:
     // void disconnect_terminator();
     void connect_learner(Learner *learner);
     // void disconnect_learner();
-    void connect_fixed_listener(FixedAssignmentListener *fixed_listener) {}
+    void connect_fixed_listener(FixedAssignmentListener *fixed_listener);
     // void disconnect_fixed_listener();
 };
 
