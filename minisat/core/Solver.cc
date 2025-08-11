@@ -436,7 +436,12 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
             if (reason(x) == CRef_Undef)
                 out_learnt[j++] = out_learnt[i];
             else{
-                Clause& c = ca[reasonLazy(var(out_learnt[i]))];
+                CRef cr = reasonLazy(var(out_learnt[i]));
+                if (cr == CRef_Undef) {
+                    assert(level(out_learnt[i]) == 0);
+                    continue;
+                }
+                Clause& c = ca[cr];
                 for (int k = 1; k < c.size(); k++)
                     if (!seen[var(c[k])] && level(var(c[k])) > 0){
                         out_learnt[j++] = out_learnt[i];
@@ -460,10 +465,16 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
 bool Solver::litRedundant(Lit p)
 {
     enum { seen_undef = 0, seen_source = 1, seen_removable = 2, seen_failed = 3 };
-    assert(seen[var(p)] == seen_undef || seen[var(p)] == seen_source);
+    assert(seen[var(p)] == seen_source);
     assert(reason(var(p)) != CRef_Undef);
 
-    Clause*               c     = &ca[reasonLazy(var(p))];
+    CRef cr = reasonLazy(var(p));
+    if (cr == CRef_Undef) {
+        assert(level(p) == 0);
+        return true;
+    }
+
+    Clause*               c     = &ca[cr];
     vec<ShrinkStackElem>& stack = analyze_stack;
     stack.clear();
 
@@ -471,11 +482,11 @@ bool Solver::litRedundant(Lit p)
         if (i < (uint32_t)c->size()){
             // Checking 'p'-parents 'l':
             Lit l = (*c)[i];
-            
+
             // Variable at level 0 or previously removable:
             if (level(var(l)) == 0 || seen[var(l)] == seen_source || seen[var(l)] == seen_removable){
                 continue; }
-            
+
             // Check variable can not be removed for some local reason:
             if (reason(var(l)) == CRef_Undef || seen[var(l)] == seen_failed){
                 stack.push(ShrinkStackElem(0, p));
@@ -484,15 +495,21 @@ bool Solver::litRedundant(Lit p)
                         seen[var(stack[i].l)] = seen_failed;
                         analyze_toclear.push(stack[i].l);
                     }
-                    
+
                 return false;
+            }
+
+            cr = reasonLazy(var(p));
+            if (cr == CRef_Undef) {
+                assert(level(p) == 0);
+                continue;
             }
 
             // Recursively check 'l':
             stack.push(ShrinkStackElem(i, p));
             i  = 0;
             p  = l;
-            c  = &ca[reasonLazy(var(p))];
+            c  = &ca[cr];
         }else{
             // Finished with current element 'p' and reason 'c':
             if (seen[var(p)] == seen_undef){
