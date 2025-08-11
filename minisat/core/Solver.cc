@@ -603,9 +603,10 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
 }
 
 void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
-    conflicts++; conflictC++;
-
     assert(analyze_level > 0);
+    assert(propagation_queue.empty() || propagation_queue.top().first >= analyze_level);
+
+    conflicts++; conflictC++;
 
     vec<Lit> learnt_clause;
     if (!analyze(confl, analyze_level, learnt_clause)) {
@@ -969,6 +970,7 @@ lbool Solver::search(int nof_conflicts)
     starts++;
 
     for (;;){
+    Propagate:
         propagate();
 
         // NO CONFLICT
@@ -1009,7 +1011,8 @@ lbool Solver::search(int nof_conflicts)
                 if (value(l) == l_False) {
                     external_get_reason(l, add_tmp);
                     add_clause_solving(add_tmp, true);
-                    continue;
+                    assert (!propagation_queue.empty());
+                    goto Propagate;
                 }
                 assert(value(l) == l_Undef);
                 assign(l, decisionLevel() == 0? CRef_Undef : CRef_External, decisionLevel());
@@ -1022,6 +1025,9 @@ lbool Solver::search(int nof_conflicts)
             while (external_propagator->cb_has_external_clause(is_forgettable)) {
                 external_get_clause(add_tmp);
                 add_clause_solving(add_tmp, is_forgettable);
+                if (!propagation_queue.empty()) {
+                    goto Propagate;
+                }
             }
 
             if (!propagation_queue.empty()) {
