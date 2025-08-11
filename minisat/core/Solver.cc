@@ -1340,16 +1340,14 @@ std::vector<int> Solver::getCurrentModel() {
     return res;
 }
 
-int Solver::calculate_lit_sort_index(Lit lit) {
-    return value(lit) == l_Undef ? 0 : value(lit) == l_False ? (INT_MAX - level(lit))
-                                                             : (INT_MIN + level(lit));
+std::pair<int, int> Solver::calculate_lit_sort_index(Lit lit) {
+    // sort by level and assignment
+    // true(low level - high level) - unassigned - false(high level - low level)
+    return std::make_pair(value(lit) == l_Undef ? 0 : value(lit) == l_False ? (INT_MAX - level(lit)) : (INT_MIN + level(lit)), lit.x);
 }
 
 void Solver::sort_clause_solving(vec<Lit>& ps) {
-    sort(ps, [this](Lit a, Lit b) {
-        int la = calculate_lit_sort_index(a), lb = calculate_lit_sort_index(b);
-        return la == lb ? a < b : la < lb;
-    });
+    sort(ps, [this](Lit a, Lit b) { return calculate_lit_sort_index(a) < calculate_lit_sort_index(b); });
 }
 
 CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
@@ -1364,27 +1362,14 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
         ps.copyTo(oc);
     }
 
-    int i, j;
+    sort_clause_solving(ps);
 
-    // sort by literal
-    sort(ps);
     // remove duplicate
-    j = i = 0;
+    int i = 0, j = 0;
     while (++i < ps.size())
         if (!(ps[j] == ps[i]) && ++j != i)
             ps[j] = ps[i];
     ps.shrink(i - j - 1);
-    // find tautology
-    for (i = 0; i < ps.size() - 1; i++) {
-        if (ps[i] == ~ps[i+1]) {
-            ipasirup_stats.skipped++;
-            return CRef_Undef;
-        }
-    }
-
-    // sort by level and assignment
-    // true(low level - high level) - unassigned - false(high level - low level)
-    sort_clause_solving(ps);
 
     // remove 0-false literals
     for (i = ps.size() - 1; i >= 0; --i) {
@@ -1521,26 +1506,14 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
         ps.copyTo(oc);
     }
 
-    int i, j;
+    sort_clause_solving(ps);
 
-    // sort by literal
-    sort(ps);
     // remove duplicate
-    j = i = 0;
+    int i = 0, j = 0;
     while (++i < ps.size())
         if (!(ps[j] == ps[i]) && ++j != i)
             ps[j] = ps[i];
     ps.shrink(i - j - 1);
-    // find tautology
-    for (i = 0; i < ps.size() - 1; i++) {
-        if (ps[i] == ~ps[i + 1]) {
-            assert(false);
-        }
-    }
-
-    // sort by level and assignment
-    // true(low level - high level) - unassigned - false(high level - low level)
-    sort_clause_solving(ps);
 
     // remove 0-false literals
     for (i = ps.size() - 1; i >= 0; --i) {

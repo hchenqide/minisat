@@ -362,7 +362,7 @@ private:
     void external_get_clause(vec<Lit> &ps);
     void external_get_reason(Lit lit, vec<Lit>& ps);
 private:
-    int calculate_lit_sort_index(Lit lit);
+    std::pair<int, int> calculate_lit_sort_index(Lit lit);
     void sort_clause_solving(vec<Lit>& ps);
     CRef add_clause_solving(vec<Lit>& ps, bool forgettable);
     CRef add_clause_lazy(Lit lit, vec<Lit>& ps);
