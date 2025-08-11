@@ -32,7 +32,7 @@ using namespace Minisat;
 void print_vec_lit(const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(v[i])); printf("\n"); }
 void print_vec_var(const vec<Var>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(mkLit(v[i]))); printf("\n"); }
 void print_vec_watch(const vec<Minisat::Solver::Watcher>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", v[i].cref); printf("\n"); }
-
+void print_clause(const Clause& c) { for (int i = 0; i < c.size(); i++) printf("%d ", LitToint(c[i])); printf("\n"); }
 
 //=================================================================================================
 // Options:
@@ -365,6 +365,8 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         if (c.learnt())
             claBumpActivity(c);
 
+        assert(level(c[1]) == analyze_level);
+
         for (int j = (p == lit_Undef) ? 0 : 1; j < c.size(); j++){
             Lit q = c[j];
             assert(value(q) == l_False);
@@ -694,7 +696,10 @@ void Solver::propagate()
     int     num_props = 0;
 
     while (!propagation_queue.empty()) {
-        auto [l, v] = propagation_queue.top(); propagation_queue.pop();
+        auto next = propagation_queue.top(); propagation_queue.pop();
+        while(!propagation_queue.empty() && next == propagation_queue.top()) { propagation_queue.pop(); }
+        auto [l, v] = next;
+
         if (value(v) == l_Undef) {
             continue;
         }
@@ -751,49 +756,45 @@ void Solver::propagate()
             if (k_max != 1) {
                 c[1] = c[k_max]; c[k_max] = false_lit;
                 watches[~c[1]].push(w);
+                propagation_queue.push({ level_max, var(c[1]) });
+                continue;
             } else {
                 *j++ = w;
             }
 
+            assert(l == level_max);
+
             if (value(first) == l_False) {
-                if (level(first) > level_max) {
+                if (level(first) > l) {
                     cancelUntil(level(first) - 1);
-                    assign(first, cr, level_max);
-                } else if (level(first) == level_max) {
-                    if (level_max == 0) {
+                    assign(first, cr, l);
+                } else if (level(first) == l) {
+                    if (l == 0) {
                         throw l_False;
                     }
                     Watcher* ws_old = ws.get();
-                    analyzeAndLearn(cr, level_max);
 
-                    assert(!propagation_queue.empty() && propagation_queue.top().first < level_max);
+                    analyzeAndLearn(cr, l);
+                    assert(!propagation_queue.empty() && propagation_queue.top().first < l);
 
                     assert(end <= ws_old + ws.size());
-                    i = ws.get() + (i - ws_old);
-                    j = ws.get() + (j - ws_old);
-                    end = ws.get() + ws.size();
+                    Watcher* ws_new = ws.get();
+                    for(i = ws_new + (i - ws_old), j = ws_new + (j - ws_old), end = ws_new + ws.size(); i < end;) *j++ = *i++;
+                    ws.shrink(i - j);
 
-                    if (level_max == l) {
-                        // Copy the remaining watches: (!not copied when UNSAT)
-                        while (i < end) *j++ = *i++;
-                        ws.shrink(i - j);
-                        goto NextVariable;
-                    } else {
-                        assert(decisionLevel() >= l);
-                        continue;
-                    }
+                    goto NextVariable;
                 } else {
                     continue;
                 }
             } else if (value(first) == l_True) {
-                if (level(first) <= level_max) {
+                if (level(first) <= l) {
                     continue;
                 } else {
-                    reassign(var(first), cr, level_max);
+                    reassign(var(first), cr, l);
                 }
             } else {
                 assert(value(first) == l_Undef);
-                assign(first, cr, level_max);
+                assign(first, cr, l);
             }
         NextClause:;
         }
