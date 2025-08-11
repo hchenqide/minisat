@@ -55,13 +55,13 @@ public:
     }
     void add_observed_var(int var) {
         ensureVar(intToVar(var));
+        Solver::add_observed_var(var);
     }
     void remove_observed_var(int var) {
-        assert(true);
+        Solver::remove_observed_var(var);
     }
     bool is_decision(int lit) {
-        Var v = intToVar(lit);
-        return vardata[v].reason == CRef_Undef && level(v) > 0;
+        return Solver::is_decision(lit);
     }
     void phase(int lit) {
         setPolarity(intToVar(lit), lit < 0 ? l_True : l_False);

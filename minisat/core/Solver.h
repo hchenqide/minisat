@@ -355,6 +355,7 @@ private:
 protected:
     MiniSatUP::ExternalPropagator *external_propagator = nullptr;
 private:
+    VMap<bool> observed;
     int notify_assignment_index = 0;
     bool notify_backtrack = false;
 private:

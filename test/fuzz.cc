@@ -273,6 +273,10 @@ int main(int argc, char** argv) {
     Propagator p(max_var);
     s.connect_external_propagator(&p);
 
+    for (int i = 1; i <= max_var; ++i) {
+        s.add_observed_var(i);
+    }
+
     // open output proof file
     s.output = (argc >= 3) ? fopen(argv[2], "wb") : NULL;
 

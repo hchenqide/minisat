@@ -144,6 +144,7 @@ Var Solver::newVar(lbool upol, bool dvar)
     decision .reserve(v);
     trail    .capacity(v+1);
     setDecisionVar(v, dvar);
+    observed .insert(v, false);
     return v;
 }
 
@@ -1004,10 +1005,14 @@ lbool Solver::search(int nof_conflicts)
             }
             if (notify_assignment_index < trail.size()) {
                 std::vector<int> new_assignments; new_assignments.reserve(trail.size() - notify_assignment_index);
-                while(notify_assignment_index < trail.size()) {
-                    new_assignments.push_back(LitToint(trail[notify_assignment_index++]));
+                for (; notify_assignment_index < trail.size(); notify_assignment_index++) {
+                    if (observed[var(trail[notify_assignment_index])]) {
+                        new_assignments.push_back(LitToint(trail[notify_assignment_index]));
+                    }
                 }
-                external_propagator->notify_assignment(new_assignments);
+                if (!new_assignments.empty()) {
+                    external_propagator->notify_assignment(new_assignments);
+                }
             }
 
             // request external units
@@ -1571,6 +1576,7 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
 }
 
 void Solver::connect_external_propagator(MiniSatUP::ExternalPropagator *external_propagator) {
+    assert(this -> external_propagator == nullptr);
     this->external_propagator = external_propagator;
     notify_assignment_index = 0;
     notify_backtrack = false;
@@ -1581,16 +1587,33 @@ void Solver::connect_external_propagator(MiniSatUP::ExternalPropagator *external
 }
 
 void Solver::disconnect_external_propagator () {
+    assert(this->external_propagator != nullptr);
+    reset_observed_vars();
     this->external_propagator = nullptr;
 }
 
 void Solver::add_observed_var (int idx) {
+    assert(this->external_propagator);
+    observed[intToVar(idx)] = true;
 }
 
 void Solver::remove_observed_var (int idx) {
+    observed[intToVar(idx)] = false;
 }
 
 void Solver::reset_observed_vars () {
+    for (Var v = 0; v < nVars(); v++) {
+        observed[v] = false;
+    }
+}
+
+bool Solver::is_decision(int lit) {
+    Var v = intToVar(lit);
+    return observed[v] && vardata[v].reason == CRef_Undef && level(v) > 0;
+}
+
+void Solver::force_backtrack(size_t new_level) {
+    cancelUntil((int)new_level);
 }
 
 /*===== IPASIR-UP END ====================================================*/
