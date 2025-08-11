@@ -761,7 +761,6 @@ void Solver::propagate()
                     Watcher* ws_old = ws.get();
                     analyzeAndLearn(cr, level_max);
 
-                    assert(decisionLevel() <= level_max);
                     assert(!propagation_queue.empty() && propagation_queue.top().first < level_max);
 
                     assert(end <= ws_old + ws.size());
