@@ -1361,21 +1361,6 @@ std::pair<int, int> Solver::calculate_lit_sort_index(Lit lit) {
 
 void Solver::sort_clause_solving(vec<Lit>& ps) {
     sort(ps, [this](Lit a, Lit b) { return calculate_lit_sort_index(a) < calculate_lit_sort_index(b); });
-}
-
-CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
-    // empty clause
-    if (ps.size() == 0) {
-        ipasirup_stats.unsat++;
-        throw l_False; // UNSAT
-    }
-
-    // proof keep original clause for output
-    if (output) {
-        ps.copyTo(oc);
-    }
-
-    sort_clause_solving(ps);
 
     // remove duplicate
     int i = 0, j = 0;
@@ -1391,6 +1376,21 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
         }
     }
     ps.shrink(ps.size() - 1 - i);
+}
+
+CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
+    // empty clause
+    if (ps.size() == 0) {
+        ipasirup_stats.unsat++;
+        throw l_False; // UNSAT
+    }
+
+    // proof keep original clause for output
+    if (output) {
+        ps.copyTo(oc);
+    }
+
+    sort_clause_solving(ps);
 
     // empty
     if (ps.size() == 0) {
@@ -1520,21 +1520,6 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     }
 
     sort_clause_solving(ps);
-
-    // remove duplicate
-    int i = 0, j = 0;
-    while (++i < ps.size())
-        if (!(ps[j] == ps[i]) && ++j != i)
-            ps[j] = ps[i];
-    ps.shrink(i - j - 1);
-
-    // remove 0-false literals
-    for (i = ps.size() - 1; i >= 0; --i) {
-        if (value(ps[i]) != l_False || level(ps[i]) != 0) {
-            break;
-        }
-    }
-    ps.shrink(ps.size() - 1 - i);
 
     // empty
     if (ps.size() == 0) {
