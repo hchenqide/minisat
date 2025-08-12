@@ -312,6 +312,7 @@ Lit Solver::pickBranchLit()
                     return l;
                 }
             }
+// warning: cb_decide in cvc5 also does model check which might allocate new variables and prepare new clauses, in this case the decision can be deferred
         }
     }
 
