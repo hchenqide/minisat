@@ -292,6 +292,16 @@ void Solver::cancelUntil(int l) {
         trail.shrink(i - j);
         trail_level.shrink(trail_lim.size() - l);
         trail_lim.shrink(trail_lim.size() - l);
+
+        if (fixed_listener && decisionLevel() == 0) {
+            if (external_propagator && notify_backtrack) {
+                external_propagator->notify_backtrack(decisionLevel());
+                notify_backtrack = false;
+            }
+            for (int i = notify_assignment_index; i < trail.size(); ++i) {
+                fixed_listener->notify_fixed_assignment(LitToint(trail[i]));
+            }
+        }
     }
 }
 
@@ -681,7 +691,8 @@ void Solver::assign(Lit p, CRef c, int l)
     vardata[var(p)] = mkVarData(c, l);
     trail_level[l].push(p);
     propagation_queue.push({l, var(p)});
-    if (l == 0 && fixed_listener) {
+
+    if (l == 0 && fixed_listener && decisionLevel() == 0) {
         if (external_propagator && notify_backtrack) {
             external_propagator->notify_backtrack(decisionLevel());
             notify_backtrack = false;
@@ -700,9 +711,6 @@ void Solver::reassign(Var x, CRef c, int l)
     vardata[x] = mkVarData(c, l);
     trail_level[l].push(p);
     propagation_queue.push({l, x});
-    if (l == 0 && fixed_listener) {
-        fixed_listener->notify_fixed_assignment(LitToint(p));
-    }
 }
 
 /*_________________________________________________________________________________________________
