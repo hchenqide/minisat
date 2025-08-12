@@ -687,9 +687,9 @@ void Solver::assign(Lit p, CRef c, int l)
             external_propagator->notify_backtrack(decisionLevel());
             notify_backtrack = false;
         }
-        fixed_listener->notify_fixed_assignment(LitToint(p));
-        notify_fixed_assignment_index++;
-        assert(notify_fixed_assignment_index == trail.size());
+        while (notify_fixed_assignment_index < trail.size()) {
+            fixed_listener->notify_fixed_assignment(LitToint(trail[notify_fixed_assignment_index++]));
+        }
     }
 }
 
