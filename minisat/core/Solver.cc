@@ -675,12 +675,16 @@ void Solver::assign(Lit p, CRef c, int l)
 {
     assert(value(p) == l_Undef);
     assigns[var(p)] = lbool(!sign(p));
-    vardata[var(p)] = mkVarData(c, l);
     trail.push_(p);
+
+    vardata[var(p)] = mkVarData(c, l);
     trail_level[l].push(p);
     propagation_queue.push({l, var(p)});
-
     if (l == 0 && fixed_listener) {
+        if (external_propagator && notify_backtrack) {
+            external_propagator->notify_backtrack(decisionLevel());
+            notify_backtrack = false;
+        }
         fixed_listener->notify_fixed_assignment(LitToint(p));
     }
 }
@@ -691,10 +695,10 @@ void Solver::reassign(Var x, CRef c, int l)
     assert(level(x) > l);
     Lit p = mkLit(x, assigns[x] == l_False);
     assert(value(p) == l_True);
+
     vardata[x] = mkVarData(c, l);
     trail_level[l].push(p);
     propagation_queue.push({l, x});
-
     if (l == 0 && fixed_listener) {
         fixed_listener->notify_fixed_assignment(LitToint(p));
     }
