@@ -674,6 +674,7 @@ void Solver::uncheckedEnqueue(Lit p, CRef from)
 
 void Solver::assign(Lit p, CRef c, int l)
 {
+    assert(l > 0 || decisionLevel() == 0);
     assert(value(p) == l_Undef);
     assigns[var(p)] = lbool(!sign(p));
     trail.push_(p);
@@ -682,7 +683,7 @@ void Solver::assign(Lit p, CRef c, int l)
     trail_level[l].push(p);
     propagation_queue.push({l, var(p)});
 
-    if (l == 0 && fixed_listener && decisionLevel() == 0) {
+    if (l == 0 && fixed_listener) {
         if (external_propagator && notify_backtrack) {
             external_propagator->notify_backtrack(decisionLevel());
             notify_backtrack = false;
@@ -785,15 +786,23 @@ void Solver::propagate()
                 *j++ = w;
             }
 
+            if (level_max == 0) {
+                if (value(first) == l_False && level(first) == 0) {
+                    throw l_False;
+                }
+                if (value(first) == l_True && level(first) == 0) {
+                    continue;
+                }
+                cancelUntil(0);
+                assign(first, cr, 0);
+                continue;
+            }
+
             if (value(first) == l_False) {
                 if (level(first) > level_max) {
                     cancelUntil(level(first) - 1);
                     assign(first, cr, level_max);
                 } else if (level(first) == level_max) {
-                    if (level_max == 0) {
-                        throw l_False;
-                    }
-
                     if (level_max > l) {
                         propagation_queue.push({level_max, var(first)});
                         continue;
@@ -1446,17 +1455,8 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
     if (ps.size() == 1) {
         ipasirup_stats.unit++;
         Lit a = ps[0];
-        if (value(a) == l_Undef) {
-            assign(a, CRef_Undef, 0);
-        } else {
-            assert(level(a) > 0);
-            if (value(a) == l_True) {
-                reassign(var(a), CRef_Undef, 0);
-            } else{
-                cancelUntil(level(a) - 1);
-                assign(a, CRef_Undef, 0);
-            }
-        }
+        cancelUntil(0);
+        assign(a, CRef_Undef, 0);
         return CRef_Undef;
     }
 
