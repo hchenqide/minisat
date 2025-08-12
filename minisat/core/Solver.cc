@@ -1613,8 +1613,8 @@ void Solver::reset_observed_vars () {
 }
 
 bool Solver::is_decision(int lit) {
-    Var v = intToVar(lit);
-    return observed[v] && vardata[v].reason == CRef_Undef && level(v) > 0;
+    Var v = intToVar(lit); Lit l = mkLit(v, lit < 0);
+    return observed[v] && value(l) == l_True && vardata[v].reason == CRef_Undef && level(v) > 0;
 }
 
 void Solver::force_backtrack(size_t new_level) {
