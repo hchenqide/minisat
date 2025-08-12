@@ -707,7 +707,8 @@ void Solver::propagate()
 
     while (!propagation_queue.empty()) {
         auto next = propagation_queue.top(); propagation_queue.pop();
-        while(!propagation_queue.empty() && next == propagation_queue.top()) { propagation_queue.pop(); }
+        assert(propagation_queue.empty() || next != propagation_queue.top());
+
         auto [l, v] = next;
 
         if (value(v) == l_Undef) {
@@ -763,25 +764,26 @@ void Solver::propagate()
                     }
                 }
 
-            if (k_max != 1) {
+            if (level_max > l) {
                 c[1] = c[k_max]; c[k_max] = false_lit;
                 watches[~c[1]].push(w);
-                propagation_queue.push({ level_max, var(c[1]) });
-                continue;
             } else {
                 *j++ = w;
             }
 
-            assert(l == level_max);
-
             if (value(first) == l_False) {
-                if (level(first) > l) {
+                if (level(first) > level_max) {
                     cancelUntil(level(first) - 1);
-                    assign(first, cr, l);
-                } else if (level(first) == l) {
-                    if (l == 0) {
+                    assign(first, cr, level_max);
+                } else if (level(first) == level_max) {
+                    if (level_max == 0) {
                         throw l_False;
                     }
+
+                    if (level_max > l) {
+                        continue;
+                    }
+
                     Watcher* ws_old = ws.get();
 
                     analyzeAndLearn(cr, l);
@@ -797,14 +799,14 @@ void Solver::propagate()
                     continue;
                 }
             } else if (value(first) == l_True) {
-                if (level(first) <= l) {
+                if (level(first) <= level_max) {
                     continue;
                 } else {
-                    reassign(var(first), cr, l);
+                    reassign(var(first), cr, level_max);
                 }
             } else {
                 assert(value(first) == l_Undef);
-                assign(first, cr, l);
+                assign(first, cr, level_max);
             }
         NextClause:;
         }
@@ -1047,6 +1049,8 @@ lbool Solver::search(int nof_conflicts)
                 continue;
             }
         }
+
+        assert(propagation_queue.empty());
 
         Lit next = lit_Undef;
         while (decisionLevel() < assumptions.size()){
