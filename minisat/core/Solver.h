@@ -440,10 +440,11 @@ protected:
     MiniSatUP::Terminator* terminator = nullptr;
     MiniSatUP::Learner* learner = nullptr;
     MiniSatUP::FixedAssignmentListener* fixed_listener = nullptr;
+    int notify_fixed_assignment_index = 0;
 public:
     void connect_terminator(MiniSatUP::Terminator* terminator) { this->terminator = terminator; }
     void connect_learner(MiniSatUP::Learner* learner) { this->learner = learner; }
-    void connect_fixed_listener(MiniSatUP::FixedAssignmentListener* fixed_listener) { this->fixed_listener = fixed_listener; }
+    void connect_fixed_listener(MiniSatUP::FixedAssignmentListener* fixed_listener) { this->fixed_listener = fixed_listener; notify_fixed_assignment_index = 0; }
 };
 
 

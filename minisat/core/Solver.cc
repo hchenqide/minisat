@@ -292,16 +292,6 @@ void Solver::cancelUntil(int l) {
         trail.shrink(i - j);
         trail_level.shrink(trail_lim.size() - l);
         trail_lim.shrink(trail_lim.size() - l);
-
-        if (fixed_listener && decisionLevel() == 0) {
-            if (external_propagator && notify_backtrack) {
-                external_propagator->notify_backtrack(decisionLevel());
-                notify_backtrack = false;
-            }
-            for (int i = notify_assignment_index; i < trail.size(); ++i) {
-                fixed_listener->notify_fixed_assignment(LitToint(trail[i]));
-            }
-        }
     }
 }
 
@@ -698,6 +688,8 @@ void Solver::assign(Lit p, CRef c, int l)
             notify_backtrack = false;
         }
         fixed_listener->notify_fixed_assignment(LitToint(p));
+        notify_fixed_assignment_index++;
+        assert(notify_fixed_assignment_index == trail.size());
     }
 }
 
@@ -1022,6 +1014,16 @@ lbool Solver::search(int nof_conflicts)
         if (learnts.size()-nAssigns() >= max_learnts)
             // Reduce the set of learnt clauses:
             reduceDB();
+
+        if (fixed_listener && decisionLevel() == 0) {
+            if (external_propagator && notify_backtrack) {
+                external_propagator->notify_backtrack(decisionLevel());
+                notify_backtrack = false;
+            }
+            while (notify_fixed_assignment_index < trail.size()) {
+                fixed_listener->notify_fixed_assignment(LitToint(trail[notify_fixed_assignment_index++]));
+            }
+        }
 
         if (external_propagator) {
             // notify external propagator of backtrack and assignment
