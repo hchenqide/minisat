@@ -18,21 +18,31 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#include <math.h>
-
 #include "minisat/mtl/Alg.h"
 #include "minisat/mtl/Sort.h"
 #include "minisat/utils/System.h"
 #include "minisat/core/Solver.h"
 
+#include <math.h>
+#include <algorithm>
+
 using namespace Minisat;
 
 
-// debug print vec<Lit>, vec<Var>
+// debug helpers
+
 void print_vec_lit(const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(v[i])); printf("\n"); }
 void print_vec_var(const vec<Var>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(mkLit(v[i]))); printf("\n"); }
 void print_vec_watch(const vec<Minisat::Solver::Watcher>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", v[i].cref); printf("\n"); }
 void print_clause(const Clause& c) { for (int i = 0; i < c.size(); i++) printf("%d ", LitToint(c[i])); printf("\n"); }
+
+class priority_queue_extension : public std::priority_queue<std::pair<int, Var>, std::vector<std::pair<int, Var>>, std::greater<std::pair<int, Var>>> {
+public:
+    bool has(std::pair<int, Var> p) {
+        return std::find(c.begin(), c.end(), p) != c.end();
+    }
+};
+
 
 //=================================================================================================
 // Options:
@@ -707,8 +717,7 @@ void Solver::propagate()
 
     while (!propagation_queue.empty()) {
         auto next = propagation_queue.top(); propagation_queue.pop();
-        assert(propagation_queue.empty() || next != propagation_queue.top());
-
+        while(!propagation_queue.empty() && next == propagation_queue.top()) { propagation_queue.pop(); }
         auto [l, v] = next;
 
         if (value(v) == l_Undef) {
@@ -781,6 +790,7 @@ void Solver::propagate()
                     }
 
                     if (level_max > l) {
+                        propagation_queue.push({level_max, var(first)});
                         continue;
                     }
 
@@ -796,6 +806,7 @@ void Solver::propagate()
 
                     goto NextVariable;
                 } else {
+                    assert(static_cast<priority_queue_extension&>(propagation_queue).has({level(first), var(first)}));
                     continue;
                 }
             } else if (value(first) == l_True) {
