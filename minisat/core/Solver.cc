@@ -204,7 +204,7 @@ bool Solver::addClause_(vec<Lit>& ps)
         assign(ps[0], CRef_Undef, 0);
         try{
             propagate();
-        } catch(...){
+        } catch(lbool){
             return ok = false;
         }
     }else{
@@ -934,7 +934,7 @@ bool Solver::simplify()
 
     try {
         propagate();
-    } catch (...) {
+    } catch (lbool) {
         return ok = false;
     }
 
@@ -1182,7 +1182,7 @@ lbool Solver::solve_()
         double rest_base = luby_restart ? luby(restart_inc, curr_restarts) : pow(restart_inc, curr_restarts);
         try{
             status = search(rest_base * restart_first);
-        } catch (...) {
+        } catch (lbool) {
             status = l_False;
         }
         if (!withinBudget()) break;
