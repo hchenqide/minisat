@@ -32,6 +32,7 @@ using namespace Minisat;
 // debug helpers
 
 void print_vec_lit(const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(v[i])); printf("\n"); }
+// void print_vec_lit_level(Solver& solver, const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) printf("%d:%c%d ", LitToint(v[i]), solver.value(v[i]) == l_True ? 'T' : solver.value(v[i]) == l_False? 'F' : 'U', solver.value(v[i]) == l_Undef ? 0 : solver.level(v[i])); printf("\n"); }
 void print_vec_var(const vec<Var>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(mkLit(v[i]))); printf("\n"); }
 // void print_vec_watch(const vec<Minisat::Solver::Watcher>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", v[i].cref); printf("\n"); }
 void print_clause(const Clause& c) { for (int i = 0; i < c.size(); i++) printf("%d ", LitToint(c[i])); printf("\n"); }
@@ -368,6 +369,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
     //
     out_learnt.push();      // (leave room for the asserting literal)
     vec<Lit> &current_trail = trail_level[analyze_level];
+    assert(current_trail.size() >= 2);
     int i = current_trail.size() - 1, j = i;
 
     do{
@@ -427,10 +429,13 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         }
     } while (pathC > 0);
 
-    for (++i, ++i, ++j; i < current_trail.size(); ++i, ++j){
-        current_trail[j] = current_trail[i];
+    assert(j <= i);
+    if (j < i) {
+        for (++i, ++j; i < current_trail.size(); ++i, ++j) {
+            current_trail[j] = current_trail[i];
+        }
+        current_trail.shrink(i - j);
     }
-    current_trail.shrink(i - j);
 
     if (level(p) < analyze_level) {
         for (int j = 1; j < out_learnt.size(); j++) seen[var(out_learnt[j])] = 0;
@@ -603,10 +608,13 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
             }
         }
 
-        for (++i, ++j; i < current_trail.size(); ++i, ++j){
-            current_trail[j] = current_trail[i];
+        assert(j <= i);
+        if (j < i) {
+            for (++i, ++j; i < current_trail.size(); ++i, ++j){
+                current_trail[j] = current_trail[i];
+            }
+            current_trail.shrink(i - j);
         }
-        current_trail.shrink(i - j);
     }
 
     seen[var(p)] = 0;
