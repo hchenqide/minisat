@@ -630,7 +630,9 @@ void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
         return;
     }
 
-    assert([&]() { for (int i = 0; i < learnt_clause.size(); i++) { assert(value(learnt_clause[i]) == l_False); } return true; }());
+    assert(learnt_clause.size() > 0);
+    assert(value(learnt_clause[0]) == l_False && level(learnt_clause[0]) == analyze_level);
+    assert([&]() { for (int i = 1; i < learnt_clause.size(); i++) { assert(value(learnt_clause[i]) == l_False && level(learnt_clause[i]) < analyze_level && level(learnt_clause[i]) > 0); } return true; }());
 
     // proof print learned clause
     if (output) {
@@ -644,11 +646,29 @@ void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
         learner->learn(0);
     }
 
-    CRef cr = add_clause_solving(learnt_clause, true);
-    if (cr == CRef_Undef) {
-        assert(learnt_clause.size() == 1);
+    cancelUntil(analyze_level - 1);
+
+    if (learnt_clause.size() == 1) {
+        assign(learnt_clause[0], CRef_Undef, 0);
     } else {
+        Lit p = learnt_clause[1];
+        int max_i = 1;
+        int max_level = level(p);
+        for (int i = 2; i < learnt_clause.size(); i++) {
+            int curr_level = level(learnt_clause[i]);
+            if (curr_level > max_level) {
+                max_level = curr_level;
+                max_i = i;
+            }
+        }
+        learnt_clause[1] = learnt_clause[max_i]; learnt_clause[max_i] = p;
+
+        CRef cr = ca.alloc(learnt_clause, true);
+        learnts.push(cr);
+        attachClause(cr);
         claBumpActivity(ca[cr]);
+
+        assign(learnt_clause[0], cr, max_level);
     }
 
     varDecayActivity();
@@ -1061,7 +1081,7 @@ lbool Solver::search(int nof_conflicts)
                 if (value(l) == l_False) {
                     external_get_reason(l, add_tmp);
                     add_clause_solving(add_tmp, true);
-                    assert (!propagation_queue.empty());
+                    assert(!propagation_queue.empty());
                     goto Propagate;
                 }
                 assert(value(l) == l_Undef);
@@ -1417,7 +1437,7 @@ void Solver::sort_clause_solving(vec<Lit>& ps) {
     ps.shrink(ps.size() - 1 - i);
 }
 
-CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
+void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
     // empty clause
     if (ps.size() == 0) {
         ipasirup_stats.unsat++;
@@ -1440,7 +1460,7 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
     // contains 0-true literals
     if (value(ps[0]) == l_True && level(ps[0]) == 0) {
         ipasirup_stats.skipped++;
-        return CRef_Undef;
+        return;
     }
 
     // proof output
@@ -1466,13 +1486,13 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
                 assign(a, CRef_Undef, 0);
             }
         }
-        return CRef_Undef;
+        return;
     }
 
     ipasirup_stats.watched++;
 
     CRef cr = ca.alloc(ps, forgettable);
-    clauses.push(cr);
+    forgettable? learnts.push(cr) : clauses.push(cr);
     attachClause(cr);
 
     Lit a = ps[0], b = ps[1];
@@ -1510,14 +1530,12 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
             }
         } else if (value(b) == l_Undef) {
             ipasirup_stats.tu++;
-            return false;
         } else {
             assert(value(b) == l_True);
             assert(level(a) < level(b) || (level(a) == level(b) && a < b));
             ipasirup_stats.tt++;
         }
     }
-    return cr;
 }
 
 void Solver::external_get_clause(vec<Lit>& ps) {
@@ -1541,13 +1559,13 @@ CRef Solver::reasonLazy(Var x) {
             assert(assigns[x] != l_Undef);
             Lit l = mkLit(x, assigns[x] == l_False);
             external_get_reason(l, add_tmp);
-            vardata[x].reason = add_clause_lazy(l, add_tmp);
+            add_clause_lazy(l, add_tmp);
         }
     }
     return vardata[x].reason;
 }
 
-CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
+void Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     // empty clause
     if (ps.size() == 0) {
         assert(false);
@@ -1579,7 +1597,7 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
         assert(a == lit);
         assert(value(a) == l_True);
         reassign(var(a), CRef_Undef, 0);
-        return CRef_Undef;
+        return;
     }
 
     Lit a = ps[0], b = ps[1];
@@ -1594,9 +1612,10 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
 
     if (level(a) > level(b)) {
         reassign(var(a), cr, level(b));
+        return;
     }
 
-    return cr;
+    vardata[var(lit)].reason = cr;
 }
 
 void Solver::connect_external_propagator(MiniSatUP::ExternalPropagator *external_propagator) {

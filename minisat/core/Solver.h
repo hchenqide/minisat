@@ -367,8 +367,8 @@ private:
 private:
     std::pair<int, int> calculate_lit_sort_index(Lit lit);
     void sort_clause_solving(vec<Lit>& ps);
-    CRef add_clause_solving(vec<Lit>& ps, bool forgettable);
-    CRef add_clause_lazy(Lit lit, vec<Lit>& ps);
+    void add_clause_solving(vec<Lit>& ps, bool forgettable);
+    void add_clause_lazy(Lit lit, vec<Lit>& ps);
 
 public:
     // Add call-back which allows to learn, propagate and backtrack based on

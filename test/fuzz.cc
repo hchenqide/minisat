@@ -228,7 +228,7 @@ public:
 
         assert(current.empty() && current_index == 0);
         current = std::move(clauses.front()); clauses.pop_front();
-        is_forgettable = true;
+        is_forgettable = false;
         return true;
     }
     virtual int cb_add_external_clause_lit() override {
