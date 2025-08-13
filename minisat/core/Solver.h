@@ -253,7 +253,7 @@ protected:
     void     uncheckedEnqueue (Lit p, CRef from = CRef_Undef);                         // Enqueue a literal. Assumes value of literal is undefined.
     bool     enqueue          (Lit p, CRef from = CRef_Undef);                         // Test if fact 'p' contradicts current state, enqueue otherwise.
     void     assign           (Lit p, CRef c, int level);
-    void     reassign         (Var x, CRef c, int level);
+    void     reassign         (Lit p, CRef c, int level);
     void     reassign_negation(Lit p, CRef c, int level);
     void     propagate        ();                                                      // Perform propagation.
     void     cancelUntil      (int level);                                             // Backtrack until a certain level.

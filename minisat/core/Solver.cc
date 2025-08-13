@@ -717,7 +717,6 @@ void Solver::uncheckedEnqueue(Lit p, CRef from)
 void Solver::assign(Lit p, CRef c, int l)
 {
     assert(value(p) == l_Undef);
-    assert(l <= decisionLevel());
     assigns[var(p)] = lbool(!sign(p));
     trail.push_(p);
 
@@ -736,16 +735,13 @@ void Solver::assign(Lit p, CRef c, int l)
     }
 }
 
-void Solver::reassign(Var x, CRef c, int l)
+void Solver::reassign(Lit p, CRef c, int l)
 {
-    assert(value(x) != l_Undef);
-    assert(level(x) > l);
-    Lit p = mkLit(x, assigns[x] == l_False);
     assert(value(p) == l_True);
-
-    vardata[x] = mkVarData(c, l);
+    assert(level(p) > l);
+    vardata[var(p)] = mkVarData(c, l);
     trail_level[l].push(p);
-    propagation_queue.push({l, x});
+    propagation_queue.push({l, var(p)});
 }
 
 void Solver::reassign_negation(Lit p, CRef c, int l)
@@ -872,7 +868,7 @@ void Solver::propagate()
                 if (level(first) <= level_max) {
                     continue;
                 } else {
-                    reassign(var(first), cr, level_max);
+                    reassign(first, cr, level_max);
                 }
             } else {
                 assert(value(first) == l_Undef);
@@ -1531,7 +1527,7 @@ void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
         } else {
             assert(level(a) > 0);
             if (value(a) == l_True) {
-                reassign(var(a), CRef_Undef, 0);
+                reassign(a, CRef_Undef, 0);
             } else{
                 reassign_negation(a, CRef_Undef, 0);
             }
@@ -1580,7 +1576,7 @@ void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
             ipasirup_stats.tf++;
             if (level(a) > level(b)) {
                 ipasirup_stats.tf_prop++;
-                reassign(var(a), cr, level(b));
+                reassign(a, cr, level(b));
             } else {
                 ipasirup_stats.tf_unprop++;
             }
@@ -1630,7 +1626,7 @@ void Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     if (ps.size() == 1) {
         assert(a == lit);
         assert(value(a) == l_True);
-        reassign(var(a), CRef_Undef, 0);
+        reassign(a, CRef_Undef, 0);
         return;
     }
 
@@ -1687,7 +1683,7 @@ void Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     }
 
     if (ps.size() == 1) {
-        reassign(var(a), CRef_Undef, 0);
+        reassign(a, CRef_Undef, 0);
         return;
     }
 
@@ -1705,7 +1701,7 @@ void Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     attachClause(cr);
 
     if (level(a) > level_max) {
-        reassign(var(a), cr, level_max);
+        reassign(a, cr, level_max);
         return;
     }
 
