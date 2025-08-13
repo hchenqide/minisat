@@ -646,10 +646,8 @@ void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
         learner->learn(0);
     }
 
-    cancelUntil(analyze_level - 1);
-
     if (learnt_clause.size() == 1) {
-        assign(learnt_clause[0], CRef_Undef, 0);
+        reassign_negation(learnt_clause[0], CRef_Undef, 0);
     } else {
         Lit p = learnt_clause[1];
         int max_i = 1;
@@ -668,7 +666,7 @@ void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
         attachClause(cr);
         claBumpActivity(ca[cr]);
 
-        assign(learnt_clause[0], cr, max_level);
+        reassign_negation(learnt_clause[0], cr, max_level);
     }
 
     varDecayActivity();
@@ -700,6 +698,7 @@ void Solver::uncheckedEnqueue(Lit p, CRef from)
 void Solver::assign(Lit p, CRef c, int l)
 {
     assert(value(p) == l_Undef);
+    assert(l <= decisionLevel());
     assigns[var(p)] = lbool(!sign(p));
     trail.push_(p);
 
@@ -728,6 +727,14 @@ void Solver::reassign(Var x, CRef c, int l)
     vardata[x] = mkVarData(c, l);
     trail_level[l].push(p);
     propagation_queue.push({l, x});
+}
+
+void Solver::reassign_negation(Lit p, CRef c, int l)
+{
+    assert(value(p) == l_False);
+    assert(level(p) > l);
+    cancelUntil(level(p) - 1);
+    assign(p, c, l);
 }
 
 /*_________________________________________________________________________________________________
@@ -812,8 +819,7 @@ void Solver::propagate()
 
             if (value(first) == l_False) {
                 if (level(first) > level_max) {
-                    cancelUntil(level(first) - 1);
-                    assign(first, cr, level_max);
+                    reassign_negation(first, cr, level_max);
                 } else if (level(first) == level_max) {
                     if (level_max == 0) {
                         throw exception_unsat();
@@ -1482,8 +1488,7 @@ void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
             if (value(a) == l_True) {
                 reassign(var(a), CRef_Undef, 0);
             } else{
-                cancelUntil(level(a) - 1);
-                assign(a, CRef_Undef, 0);
+                reassign_negation(a, CRef_Undef, 0);
             }
         }
         return;
@@ -1506,8 +1511,7 @@ void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
         } else {
             assert(level(a) > level(b));
             ipasirup_stats.ff_prop++;
-            cancelUntil(level(a) - 1);
-            assign(a, cr, level(b));
+            reassign_negation(a, cr, level(b));
         }
     } else if (value(a) == l_Undef) {
         if (value(b) == l_False) {

@@ -253,6 +253,7 @@ protected:
     bool     enqueue          (Lit p, CRef from = CRef_Undef);                         // Test if fact 'p' contradicts current state, enqueue otherwise.
     void     assign           (Lit p, CRef c, int level);
     void     reassign         (Var x, CRef c, int level);
+    void     reassign_negation(Lit p, CRef c, int level);
     void     propagate        ();                                                      // Perform propagation.
     void     cancelUntil      (int level);                                             // Backtrack until a certain level.
     bool     analyze          (CRef confl, int analyze_level, vec<Lit>& out_learnt);
