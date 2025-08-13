@@ -377,8 +377,6 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         if (c.learnt())
             claBumpActivity(c);
 
-        assert(level(c[1]) == analyze_level);
-
         for (int j = (p == lit_Undef) ? 0 : 1; j < c.size(); j++){
             Lit q = c[j];
             assert(value(q) == l_False);
@@ -616,7 +614,6 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
 
 void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
     assert(analyze_level > 0);
-    assert(propagation_queue.empty() || propagation_queue.top().first >= analyze_level);
 
     conflicts++; conflictC++;
 
@@ -723,7 +720,7 @@ void Solver::propagate()
 
     while (!propagation_queue.empty()) {
         auto next = propagation_queue.top(); propagation_queue.pop();
-        while(!propagation_queue.empty() && next == propagation_queue.top()) { propagation_queue.pop(); }
+        assert(propagation_queue.empty() || next != propagation_queue.top());
         auto [l, v] = next;
 
         if (value(v) == l_Undef) {
@@ -803,22 +800,26 @@ void Solver::propagate()
                     cancelUntil(level(first) - 1);
                     assign(first, cr, level_max);
                 } else if (level(first) == level_max) {
-                    if (level_max > l) {
-                        propagation_queue.push({level_max, var(first)});
-                        continue;
-                    }
-
                     Watcher* ws_old = ws.get();
 
-                    analyzeAndLearn(cr, l);
-                    assert(!propagation_queue.empty() && propagation_queue.top().first < l);
+                    analyzeAndLearn(cr, level_max);
+                    assert(!propagation_queue.empty() && propagation_queue.top().first < level_max);
 
                     assert(end <= ws_old + ws.size());
                     Watcher* ws_new = ws.get();
-                    for(i = ws_new + (i - ws_old), j = ws_new + (j - ws_old), end = ws_new + ws.size(); i < end;) *j++ = *i++;
-                    ws.shrink(i - j);
+                    i = ws_new + (i - ws_old);
+                    j = ws_new + (j - ws_old);
+                    end = ws_new + ws.size();
 
-                    goto NextVariable;
+                    if (level_max == l) {
+                        // Copy the remaining watches (not copied when UNSAT thrown).
+                        while (i < end) *j++ = *i++;
+                        ws.shrink(i - j);
+                        goto NextVariable;
+                    } else {
+                        assert(decisionLevel() >= l);
+                        continue;
+                    }
                 } else {
                     assert(static_cast<priority_queue_extension&>(propagation_queue).has({level(first), var(first)}));
                     continue;
