@@ -393,40 +393,40 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
             }
         }
 
-        // Select next clause to look at:
-        do {
-            for (;; j--) {
-                assert(j >= 0);
-                Var v = var(current_trail[j]);
-                assert(level(v) <= analyze_level);
-                if (level(v) == analyze_level) {
-                    current_trail[i--] = current_trail[j];
-                    if (seen[v]) {
-                        break;
-                    }
+        // Select next marked literal on analyze level.
+        // If the next marked literal is reassigned at a lower level by lazy reason, put it in the
+        //   learnt set, try finding a next one on analyze level, or skip analysis.
+        // Remove literals on current trail that are reassigned to lower levels at the same time.
+    SelectNext:
+        for (;; j--) {
+            assert(j >= 0);
+            Var v = var(current_trail[j]);
+            assert(level(v) <= analyze_level);
+            if (level(v) == analyze_level) {
+                current_trail[i--] = current_trail[j];
+                if (seen[v]) {
+                    break;
                 }
             }
+        }
 
-            p = current_trail[j--];
-            assert(value(p) == l_True);
-            confl = reasonLazy(var(p));
-            if (level(p) < analyze_level) {
-                if (confl == CRef_Undef) {
-                    assert(level(p) == 0);
-                    seen[var(p)] = 0;
-                } else {
-                    assert(level(p) > 0);
-                    out_learnt.push(~p);
-                }
-                i++;
-                pathC--;
-                continue;
+        p = current_trail[j--];
+        seen[var(p)] = 0;
+        pathC--;
+        confl = reasonLazy(var(p));
+        if (level(p) < analyze_level) {
+            if (confl == CRef_Undef) {
+                assert(level(p) == 0);
             } else {
-                seen[var(p)] = 0;
-                pathC--;
-                break;
+                assert(level(p) > 0);
+                seen[var(p)] = 1;
+                out_learnt.push(~p);
             }
-        } while (pathC > 0);
+            i++;
+            if (pathC > 0) {
+                goto SelectNext;
+            }
+        }
     } while (pathC > 0);
 
     for (++i, ++i, ++j; i < current_trail.size(); ++i, ++j){
