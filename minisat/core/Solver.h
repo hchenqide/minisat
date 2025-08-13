@@ -156,7 +156,7 @@ public:
     uint64_t solves, starts, decisions, rnd_decisions, propagations, conflicts;
     uint64_t dec_vars, num_clauses, num_learnts, clauses_literals, learnts_literals, max_literals, tot_literals;
 
-public:
+protected:
 
     // Helper structures:
     //
@@ -189,6 +189,8 @@ public:
         Lit      l;
         ShrinkStackElem(uint32_t _i, Lit _l) : i(_i), l(_l){}
     };
+
+    struct exception_unsat {};
 
     // Solver state:
     //

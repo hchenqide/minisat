@@ -33,7 +33,7 @@ using namespace Minisat;
 
 void print_vec_lit(const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(v[i])); printf("\n"); }
 void print_vec_var(const vec<Var>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(mkLit(v[i]))); printf("\n"); }
-void print_vec_watch(const vec<Minisat::Solver::Watcher>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", v[i].cref); printf("\n"); }
+// void print_vec_watch(const vec<Minisat::Solver::Watcher>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", v[i].cref); printf("\n"); }
 void print_clause(const Clause& c) { for (int i = 0; i < c.size(); i++) printf("%d ", LitToint(c[i])); printf("\n"); }
 
 class priority_queue_extension : public std::priority_queue<std::pair<int, Var>, std::vector<std::pair<int, Var>>, std::greater<std::pair<int, Var>>> {
@@ -202,9 +202,9 @@ bool Solver::addClause_(vec<Lit>& ps)
         return ok = false;
     else if (ps.size() == 1){
         assign(ps[0], CRef_Undef, 0);
-        try{
+        try {
             propagate();
-        } catch(lbool){
+        } catch (exception_unsat) {
             return ok = false;
         }
     }else{
@@ -788,7 +788,7 @@ void Solver::propagate()
 
             if (level_max == 0) {
                 if (value(first) == l_False && level(first) == 0) {
-                    throw l_False;
+                    throw exception_unsat();
                 }
                 if (value(first) == l_True && level(first) == 0) {
                     continue;
@@ -943,7 +943,7 @@ bool Solver::simplify()
 
     try {
         propagate();
-    } catch (lbool) {
+    } catch (exception_unsat) {
         return ok = false;
     }
 
@@ -1199,9 +1199,9 @@ lbool Solver::solve_()
     int curr_restarts = 0;
     while (status == l_Undef){
         double rest_base = luby_restart ? luby(restart_inc, curr_restarts) : pow(restart_inc, curr_restarts);
-        try{
+        try {
             status = search(rest_base * restart_first);
-        } catch (lbool) {
+        } catch (exception_unsat) {
             status = l_False;
         }
         if (!withinBudget()) break;
@@ -1421,7 +1421,7 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
     // empty clause
     if (ps.size() == 0) {
         ipasirup_stats.unsat++;
-        throw l_False; // UNSAT
+        throw exception_unsat();
     }
 
     // proof keep original clause for output
@@ -1434,7 +1434,7 @@ CRef Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
     // empty
     if (ps.size() == 0) {
         ipasirup_stats.unsat++;
-        throw l_False; // UNSAT
+        throw exception_unsat();
     }
 
     // contains 0-true literals
