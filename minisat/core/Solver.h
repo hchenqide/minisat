@@ -230,6 +230,7 @@ protected:
     // used, exept 'seen' wich is used in several places.
     //
     VMap<char>          seen;
+    VMap<char>          seen_add;
     vec<ShrinkStackElem>analyze_stack;
     vec<Lit>            analyze_toclear;
     vec<Lit>            add_tmp;
@@ -366,8 +367,6 @@ private:
     void external_get_clause(vec<Lit> &ps);
     void external_get_reason(Lit lit, vec<Lit>& ps);
 private:
-    std::pair<int, int> calculate_lit_sort_index(Lit lit);
-    void sort_clause_solving(vec<Lit>& ps);
     void add_clause_solving(vec<Lit>& ps, bool forgettable);
     void add_clause_lazy(Lit lit, vec<Lit>& ps);
 

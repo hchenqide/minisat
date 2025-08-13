@@ -150,6 +150,7 @@ Var Solver::newVar(lbool upol, bool dvar)
     vardata  .insert(v, mkVarData(CRef_Undef, 0));
     activity .insert(v, rnd_init_act ? drand(random_seed) * 0.00001 : 0);
     seen     .insert(v, 0);
+    seen_add .insert(v, 0);
     polarity .insert(v, true);
     user_pol .insert(v, upol);
     decision .reserve(v);
@@ -181,15 +182,33 @@ bool Solver::addClause_(vec<Lit>& ps)
         ps.copyTo(oc);
     }
 
-    // Check if clause is satisfied and remove false/duplicate literals:
-    sort(ps);
-    Lit p; int i, j;
-    for (i = j = 0, p = lit_Undef; i < ps.size(); i++)
-        if (value(ps[i]) == l_True || ps[i] == ~p)
+    int i, j;
+    for (i = 0, j = i; i < ps.size(); ++i) {
+        Lit p = ps[i];
+        if (seen_add[var(p)] == (sign(p) ? -1 : 1)) {
+            continue;
+        }
+        if (seen_add[var(p)] == (sign(p) ? 1 : -1)) {
+            while (--j >= 0) { seen_add[var(ps[j])] = 0; }
             return true;
-        else if (value(ps[i]) != l_False && ps[i] != p)
-            ps[j++] = p = ps[i];
+        }
+
+        lbool v = value(p);
+        if (v == l_True) {
+            while (--j >= 0) { seen_add[var(ps[j])] = 0; }
+            return true;
+        } else if (v == l_False) {
+            continue;
+        }
+
+        ps[j++] = ps[i];
+        seen_add[var(p)] = sign(p) ? -1 : 1;
+    }
     ps.shrink(i - j);
+
+    for (int i = 0; i < ps.size(); ++i) {
+        seen_add[var(ps[i])] = 0;
+    }
 
     // proof output
     if (output) {
@@ -1418,33 +1437,7 @@ std::vector<int> Solver::getCurrentModel() {
     return res;
 }
 
-std::pair<int, int> Solver::calculate_lit_sort_index(Lit lit) {
-    // sort by level and assignment
-    // true(low level - high level) - unassigned - false(high level - low level)
-    return std::make_pair(value(lit) == l_Undef ? 0 : value(lit) == l_False ? (INT_MAX - level(lit)) : (INT_MIN + level(lit)), lit.x);
-}
-
-void Solver::sort_clause_solving(vec<Lit>& ps) {
-    sort(ps, [this](Lit a, Lit b) { return calculate_lit_sort_index(a) < calculate_lit_sort_index(b); });
-
-    // remove duplicate
-    int i = 0, j = 0;
-    while (++i < ps.size())
-        if (!(ps[j] == ps[i]) && ++j != i)
-            ps[j] = ps[i];
-    ps.shrink(i - j - 1);
-
-    // remove 0-false literals
-    for (i = ps.size() - 1; i >= 0; --i) {
-        if (value(ps[i]) != l_False || level(ps[i]) != 0) {
-            break;
-        }
-    }
-    ps.shrink(ps.size() - 1 - i);
-}
-
 void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
-    // empty clause
     if (ps.size() == 0) {
         ipasirup_stats.unsat++;
         throw exception_unsat();
@@ -1455,18 +1448,59 @@ void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
         ps.copyTo(oc);
     }
 
-    sort_clause_solving(ps);
+    // normalize clause
+    int i_min = -1, i_min_next = -1;
+    int index_min = INT_MAX, index_min_next = INT_MAX;
+    int i, j;
+    for (i = 0, j = i; i < ps.size(); ++i) {
+        Lit p = ps[i];
+        if (seen_add[var(p)] == (sign(p) ? -1 : 1)) {
+            continue;
+        }
+        if (seen_add[var(p)] == (sign(p) ? 1 : -1)) {
+            while (--j >= 0) { seen_add[var(ps[j])] = 0; }
+            ipasirup_stats.skipped++;
+            return;
+        }
 
-    // empty
-    if (ps.size() == 0) {
-        ipasirup_stats.unsat++;
-        throw exception_unsat();
+        int index_curr;
+        lbool v = value(p);
+        if (v == l_True) {
+            int l = level(p);
+            if (l == 0) {
+                while (--j >= 0) { seen_add[var(ps[j])] = 0; }
+                ipasirup_stats.skipped++;
+                return;
+            } else {
+                index_curr = INT_MIN + l;
+            }
+        } else if (v == l_False) {
+            int l = level(p);
+            if (l == 0) {
+                continue;
+            } else {
+                index_curr = INT_MAX - l;
+            }
+        } else {
+            index_curr = 0;
+        }
+        if (index_curr < index_min) {
+            index_min_next = index_min;
+            i_min_next = i_min;
+            index_min = index_curr;
+            i_min = j;
+        } else if (index_curr < index_min_next) {
+            index_min_next = index_curr;
+            i_min_next = j;
+        }
+
+        ps[j++] = ps[i];
+        seen_add[var(p)] = sign(p) ? -1 : 1;
     }
+    ps.shrink(i - j);
 
-    // contains 0-true literals
-    if (value(ps[0]) == l_True && level(ps[0]) == 0) {
-        ipasirup_stats.skipped++;
-        return;
+    for (int i = 0; i < ps.size(); ++i) {
+        seen_add[var(ps[i])] = 0;
     }
 
     // proof output
@@ -1477,10 +1511,21 @@ void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
         }
     }
 
+    if (ps.size() == 0) {
+        ipasirup_stats.unsat++;
+        throw exception_unsat();
+    }
+
+    assert(i_min >= 0);
+    Lit a = ps[i_min];
+    if (i_min > 0) {
+        ps[i_min] = ps[0];
+        ps[0] = a;
+    }
+
     // unit
     if (ps.size() == 1) {
         ipasirup_stats.unit++;
-        Lit a = ps[0];
         if (value(a) == l_Undef) {
             assign(a, CRef_Undef, 0);
         } else {
@@ -1496,16 +1541,24 @@ void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
 
     ipasirup_stats.watched++;
 
+    assert(i_min_next >= 0);
+    if (i_min_next == 0) {
+        i_min_next = i_min;
+    }
+    Lit b = ps[i_min_next];
+    if (i_min_next > 1) {
+        ps[i_min_next] = ps[1];
+        ps[1] = b;
+    }
+
     CRef cr = ca.alloc(ps, forgettable);
     forgettable? learnts.push(cr) : clauses.push(cr);
     attachClause(cr);
 
-    Lit a = ps[0], b = ps[1];
     if (value(a) == l_False) {
         assert(value(b) == l_False);
         ipasirup_stats.ff++;
         if (level(a) == level(b)) {
-            assert(a < b);
             ipasirup_stats.ff_conf++;
             analyzeAndLearn(cr, level(a));
         } else {
@@ -1519,7 +1572,6 @@ void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
             assign(a, cr, level(b));
         } else {
             assert(value(b) == l_Undef);
-            assert(a < b);
             ipasirup_stats.uu++;
         }
     } else {
@@ -1536,7 +1588,7 @@ void Solver::add_clause_solving(vec<Lit>& ps, bool forgettable) {
             ipasirup_stats.tu++;
         } else {
             assert(value(b) == l_True);
-            assert(level(a) < level(b) || (level(a) == level(b) && a < b));
+            assert(level(a) <= level(b));
             ipasirup_stats.tt++;
         }
     }
@@ -1570,9 +1622,16 @@ CRef Solver::reasonLazy(Var x) {
 }
 
 void Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
-    // empty clause
-    if (ps.size() == 0) {
-        assert(false);
+    assert(ps.size() >= 1);
+
+    Lit a = ps[0];
+
+    // unit
+    if (ps.size() == 1) {
+        assert(a == lit);
+        assert(value(a) == l_True);
+        reassign(var(a), CRef_Undef, 0);
+        return;
     }
 
     // proof keep original clause for output
@@ -1580,14 +1639,46 @@ void Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
         ps.copyTo(oc);
     }
 
-    sort_clause_solving(ps);
-
-    // empty
-    if (ps.size() == 0) {
-        assert(false);
+    // sort: true, false (level max), false ...
+    if (value(a) != l_True) {
+        for (int i = 1; i < ps.size(); ++i) {
+            if (value(ps[i]) == l_True) {
+                ps[0] = ps[i]; ps[i] = a;
+                a = ps[0];
+                break;
+            }
+        }
     }
 
-    // proof output
+    assert(a == lit);
+    assert(value(a) == l_True);
+
+    int i_max = 0;
+    int level_max = 0;
+    int i, j;
+    for (i = 1, j = i; i < ps.size(); i++) {
+        Lit p = ps[i];
+        assert(value(p) == l_False);
+        int level_curr = level(p);
+        if (level_curr == 0) {
+            continue;
+        }
+        if (seen_add[var(p)]) {
+            continue;
+        }
+        if (level_curr > level_max) {
+            level_max = level_curr;
+            i_max = j;
+        }
+        ps[j++] = ps[i];
+        seen_add[var(p)] = true;
+    }
+    ps.shrink(i - j);
+
+    for (int i = 1; i < ps.size(); ++i) {
+        seen_add[var(ps[i])] = false;
+    }
+
     if (output) {
         if (ps.size() != oc.size()) {
             outputPrintClause(ps);
@@ -1595,27 +1686,26 @@ void Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
         }
     }
 
-    // unit
     if (ps.size() == 1) {
-        Lit a = ps[0];
-        assert(a == lit);
-        assert(value(a) == l_True);
         reassign(var(a), CRef_Undef, 0);
         return;
     }
 
-    Lit a = ps[0], b = ps[1];
-    assert(a == lit);
-    assert(value(a) == l_True);
-    assert(value(b) == l_False);
-    assert(level(a) >= level(b));
+    assert(i_max >= 1);
+    Lit b = ps[i_max];
+    if (i_max > 1) {
+        ps[i_max] = ps[1];
+        ps[1] = b;
+    }
+
+    assert(level(a) >= level_max);
 
     CRef cr = ca.alloc(ps, false);
     clauses.push(cr);
     attachClause(cr);
 
-    if (level(a) > level(b)) {
-        reassign(var(a), cr, level(b));
+    if (level(a) > level_max) {
+        reassign(var(a), cr, level_max);
         return;
     }
 
