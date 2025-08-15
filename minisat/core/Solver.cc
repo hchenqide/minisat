@@ -389,7 +389,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
     out_learnt.push();      // (leave room for the asserting literal)
     vec<Lit> &current_trail = trail_level[analyze_level];
     assert(current_trail.size() >= 2);
-    int i = current_trail.size() - 1, j = i;
+    int index = current_trail.size() - 1;
 
     do{
         assert(confl != CRef_Undef); // (otherwise should be UIP)
@@ -412,24 +412,10 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
             }
         }
 
-        // Select next marked literal on analyze level.
-        // If the next marked literal is reassigned at a lower level by lazy reason, put it in the
-        //   learnt set, try finding a next one on analyze level, or skip analysis.
-        // Remove literals on current trail that are reassigned to lower levels at the same time.
     SelectNext:
-        for (;; j--) {
-            assert(j >= 0);
-            Var v = var(current_trail[j]);
-            assert(level(v) <= analyze_level);
-            if (level(v) == analyze_level) {
-                current_trail[i--] = current_trail[j];
-                if (seen[v]) {
-                    break;
-                }
-            }
-        }
-
-        p = current_trail[j--];
+        assert(index >= 0);
+        while (!seen[var(current_trail[index])] || level(current_trail[index]) < analyze_level) { index--; assert(index >= 0); }
+        p = current_trail[index--];
         seen[var(p)] = 0;
         pathC--;
         confl = reasonLazy(var(p));
@@ -441,30 +427,19 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
                 seen[var(p)] = 1;
                 out_learnt.push(~p);
             }
-            i++;
             if (pathC > 0) {
                 goto SelectNext;
+            } else {
+                for (int j = 1; j < out_learnt.size(); j++) seen[var(out_learnt[j])] = 0;
+                return false;
             }
         }
     } while (pathC > 0);
-
-    assert(j <= i);
-    if (j < i) {
-        for (++i, ++j; i < current_trail.size(); ++i, ++j) {
-            current_trail[j] = current_trail[i];
-        }
-        current_trail.shrink(i - j);
-    }
-
-    if (level(p) < analyze_level) {
-        for (int j = 1; j < out_learnt.size(); j++) seen[var(out_learnt[j])] = 0;
-        return false;
-    }
-
     out_learnt[0] = ~p;
 
     // Simplify conflict clause:
     //
+    int i, j;
     out_learnt.copyTo(analyze_toclear);
     if (ccmin_mode == 2){
         for (i = j = 1; i < out_learnt.size(); i++)
@@ -595,17 +570,12 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
 
     for (int l = decisionLevel(); l > 0; l--) {
         vec<Lit>& current_trail = trail_level[l];
-        int i, j;
-        for (i = j = current_trail.size() - 1; j >= 0; j--) {
-            Var x = var(current_trail[j]);
+        for (int i = current_trail.size() - 1; i >= 0; i--) {
+            Var x = var(current_trail[i]);
             assert(level(x) <= l);
-            if (level(x) < l) {
-                continue;
-            }
-            current_trail[i--] = current_trail[j];
-            if (seen[x]) {
+            if (level(x) == l && seen[x]) {
                 if (reason(x) == CRef_Undef) {
-                    out_conflict.insert(~current_trail[j]);
+                    out_conflict.insert(~current_trail[i]);
                 } else {
                     CRef ref = reasonLazy(x);
                     if (level(x) < l) {
@@ -615,7 +585,6 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
                         } else {
                             assert(level(x) > 0);
                         }
-                        i++;
                         continue;
                     }
                     Clause& c = ca[ref];
@@ -625,14 +594,6 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
                 }
                 seen[x] = 0;
             }
-        }
-
-        assert(j <= i);
-        if (j < i) {
-            for (++i, ++j; i < current_trail.size(); ++i, ++j){
-                current_trail[j] = current_trail[i];
-            }
-            current_trail.shrink(i - j);
         }
     }
 
