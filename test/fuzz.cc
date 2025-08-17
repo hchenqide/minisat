@@ -140,9 +140,11 @@ public:
 
 public:
     virtual void notify_assignment(const std::vector<int>& lits) override {
-        assignments.insert(assignments.end(), lits.begin(), lits.end());
         for(int lit : lits) {
-            assignment_level_map.emplace(lit, assignment_level.size());
+            auto [it, success] = assignment_level_map.emplace(lit, assignment_level.size());
+            if (success) {
+                assignments.emplace_back(lit);
+            }
         }
     }
     virtual void notify_new_decision_level() override {

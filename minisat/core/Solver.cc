@@ -18,31 +18,22 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
+#include <math.h>
+
 #include "minisat/mtl/Alg.h"
 #include "minisat/mtl/Sort.h"
 #include "minisat/utils/System.h"
 #include "minisat/core/Solver.h"
 
-#include <math.h>
-#include <algorithm>
-
 using namespace Minisat;
 
 
 // debug helpers
-
 void print_vec_lit(const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(v[i])); printf("\n"); }
 // void print_vec_lit_level(Solver& solver, const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) printf("%d:%c%d ", LitToint(v[i]), solver.value(v[i]) == l_True ? 'T' : solver.value(v[i]) == l_False? 'F' : 'U', solver.value(v[i]) == l_Undef ? 0 : solver.level(v[i])); printf("\n"); }
 void print_vec_var(const vec<Var>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(mkLit(v[i]))); printf("\n"); }
 // void print_vec_watch(const vec<Minisat::Solver::Watcher>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", v[i].cref); printf("\n"); }
 void print_clause(const Clause& c) { for (int i = 0; i < c.size(); i++) printf("%d ", LitToint(c[i])); printf("\n"); }
-
-class priority_queue_extension : public std::priority_queue<std::pair<int, Var>, std::vector<std::pair<int, Var>>, std::greater<std::pair<int, Var>>> {
-public:
-    bool has(std::pair<int, Var> p) {
-        return std::find(c.begin(), c.end(), p) != c.end();
-    }
-};
 
 
 //=================================================================================================
@@ -107,6 +98,7 @@ Solver::Solver() :
   , ok                 (true)
   , cla_inc            (1)
   , var_inc            (1)
+  , qhead              (0)
   , simpDB_assigns     (-1)
   , simpDB_props       (0)
   , progress_estimate  (0)
@@ -118,9 +110,7 @@ Solver::Solver() :
   , conflict_budget    (-1)
   , propagation_budget (-1)
   , asynch_interrupt   (false)
-{
-    trail_level.push();
-}
+{}
 
 
 Solver::~Solver()
@@ -292,7 +282,15 @@ void Solver::cancelUntil(int l) {
     if (decisionLevel() > l){
         int i, j;
         for (i = j = trail_lim[l]; i < trail.size(); ++i) {
+            if (qhead == i) {
+                qhead = j;
+            }
+
             Var x = var(trail[i]);
+            if (assigns[x] == l_Undef) {
+                continue;
+            }
+
             if (level(x) <= l) {
                 trail[j++] = trail[i];
             } else{
@@ -309,8 +307,10 @@ void Solver::cancelUntil(int l) {
             notify_backtrack = true;
         }
 
+        if (qhead == i) {
+            qhead = j;
+        }
         trail.shrink(i - j);
-        trail_level.shrink(trail_lim.size() - l);
         trail_lim.shrink(trail_lim.size() - l);
     }
 }
@@ -387,9 +387,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
     // Generate conflict clause:
     //
     out_learnt.push();      // (leave room for the asserting literal)
-    vec<Lit> &current_trail = trail_level[analyze_level];
-    assert(current_trail.size() >= 2);
-    int index = current_trail.size() - 1;
+    int index   = trail.size() - 1;
 
     do{
         assert(confl != CRef_Undef); // (otherwise should be UIP)
@@ -400,7 +398,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
 
         for (int j = (p == lit_Undef) ? 0 : 1; j < c.size(); j++){
             Lit q = c[j];
-            assert(value(q) == l_False);
+
             if (!seen[var(q)] && level(var(q)) > 0){
                 varBumpActivity(var(q));
                 seen[var(q)] = 1;
@@ -414,11 +412,11 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
 
     SelectNext:
         assert(index >= 0);
-        while (!seen[var(current_trail[index])] || level(current_trail[index]) < analyze_level) { index--; assert(index >= 0); }
-        p = current_trail[index--];
+        while (!seen[var(trail[index])] || level(trail[index]) < analyze_level) { index--; assert(index >= 0); }
+        p = trail[index--];
+        confl = reasonLazy(var(p));
         seen[var(p)] = 0;
         pathC--;
-        confl = reasonLazy(var(p));
         if (level(p) < analyze_level) {
             if (confl == CRef_Undef) {
                 assert(level(p) == 0);
@@ -434,7 +432,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
                 return false;
             }
         }
-    } while (pathC > 0);
+    }while (pathC > 0);
     out_learnt[0] = ~p;
 
     // Simplify conflict clause:
@@ -568,32 +566,24 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
 
     seen[var(p)] = 1;
 
-    for (int l = decisionLevel(); l > 0; l--) {
-        vec<Lit>& current_trail = trail_level[l];
-        for (int i = current_trail.size() - 1; i >= 0; i--) {
-            Var x = var(current_trail[i]);
-            assert(level(x) <= l);
-            if (level(x) == l && seen[x]) {
-                if (reason(x) == CRef_Undef) {
-                    out_conflict.insert(~current_trail[i]);
-                } else {
-                    CRef ref = reasonLazy(x);
-                    if (level(x) < l) {
-                        if (ref == CRef_Undef) {
-                            assert(level(x) == 0);
-                            seen[x] = 0;
-                        } else {
-                            assert(level(x) > 0);
-                        }
-                        continue;
-                    }
-                    Clause& c = ca[ref];
-                    for (int j = 1; j < c.size(); j++)
-                        if (level(var(c[j])) > 0)
-                            seen[var(c[j])] = 1;
+    for (int i = trail.size()-1; i >= trail_lim[0]; i--){
+        Var x = var(trail[i]);
+        if (seen[x]){
+            if (reason(x) == CRef_Undef){
+                out_conflict.insert(~trail[i]);
+            }else{
+                CRef ref = reasonLazy(x);
+                if (ref == CRef_Undef) {
+                    assert(level(x) == 0);
+                    seen[x] = 0;
+                    continue;
                 }
-                seen[x] = 0;
+                Clause& c = ca[ref];
+                for (int j = 1; j < c.size(); j++)
+                    if (level(var(c[j])) > 0)
+                        seen[var(c[j])] = 1;
             }
+            seen[x] = 0;
         }
     }
 
@@ -604,6 +594,8 @@ void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
     assert(analyze_level > 0);
 
     conflicts++; conflictC++;
+
+    cancelUntil(analyze_level);
 
     vec<Lit> learnt_clause;
     if (!analyze(confl, analyze_level, learnt_clause)) {
@@ -679,11 +671,9 @@ void Solver::assign(Lit p, CRef c, int l)
 {
     assert(value(p) == l_Undef);
     assigns[var(p)] = lbool(!sign(p));
-    trail.push_(p);
+    trail.push(p);
 
     vardata[var(p)] = mkVarData(c, l);
-    trail_level[l].push(p);
-    propagation_queue.push({l, var(p)});
 
     if (l == 0 && fixed_listener && decisionLevel() == 0) {
         if (external_propagator && notify_backtrack) {
@@ -700,9 +690,8 @@ void Solver::reassign(Lit p, CRef c, int l)
 {
     assert(value(p) == l_True);
     assert(level(p) > l);
+    trail.push(p);
     vardata[var(p)] = mkVarData(c, l);
-    trail_level[l].push(p);
-    propagation_queue.push({l, var(p)});
 }
 
 void Solver::reassign_negation(Lit p, CRef c, int l)
@@ -728,23 +717,11 @@ void Solver::propagate()
 {
     int     num_props = 0;
 
-    while (!propagation_queue.empty()) {
-        auto next = propagation_queue.top(); propagation_queue.pop();
-        assert(propagation_queue.empty() || next != propagation_queue.top());
-        auto [l, v] = next;
-
-        if (value(v) == l_Undef) {
-            continue;
-        }
-
-        assert(level(v) <= l);
-        if (level(v) != l) {
-            continue;
-        }
-
-        Lit p = mkLit(v, assigns[v] == l_False);
-        vec<Watcher>& ws = watches.lookup(p);
-        Watcher *i, *j, *end;
+    while (qhead < trail.size()){
+        Lit            p   = trail[qhead++];     // 'p' is enqueued fact to propagate.
+        int            l   = level(p);
+        vec<Watcher>&  ws  = watches.lookup(p);
+        Watcher        *i, *j, *end;
         num_props++;
 
         for (i = j = ws.get(), end = i + ws.size(); i != end;){
@@ -804,7 +781,6 @@ void Solver::propagate()
                     Watcher* ws_old = ws.get();
 
                     analyzeAndLearn(cr, level_max);
-                    assert(!propagation_queue.empty() && propagation_queue.top().first < level_max);
 
                     assert(end <= ws_old + ws.size());
                     Watcher* ws_new = ws.get();
@@ -822,7 +798,6 @@ void Solver::propagate()
                         continue;
                     }
                 } else {
-                    assert(static_cast<priority_queue_extension&>(propagation_queue).has({level(first), var(first)}));
                     continue;
                 }
             } else if (value(first) == l_True) {
@@ -970,6 +945,7 @@ bool Solver::simplify()
             if (seen[var(trail[i])] == 0)
                 trail[j++] = trail[i];
         trail.shrink(i - j);
+        qhead = trail.size();
 
         for (int i = 0; i < released_vars.size(); i++)
             seen[released_vars[i]] = 0;
@@ -1063,7 +1039,7 @@ lbool Solver::search(int nof_conflicts)
                 if (value(l) == l_False) {
                     external_get_reason(l, add_tmp);
                     add_clause_solving(add_tmp, true);
-                    assert(!propagation_queue.empty());
+                    assert(qhead < trail.size());
                     goto Propagate;
                 }
                 assert(value(l) == l_Undef);
@@ -1077,17 +1053,17 @@ lbool Solver::search(int nof_conflicts)
             while (external_propagator->cb_has_external_clause(is_forgettable)) {
                 external_get_clause(add_tmp);
                 add_clause_solving(add_tmp, is_forgettable);
-                if (!propagation_queue.empty()) {
+                if (qhead < trail.size()) {
                     goto Propagate;
                 }
             }
 
-            if (!propagation_queue.empty()) {
+            if (qhead < trail.size()) {
                 continue;
             }
         }
 
-        assert(propagation_queue.empty());
+        assert(qhead == trail.size());
 
         Lit next = lit_Undef;
         while (decisionLevel() < assumptions.size()){

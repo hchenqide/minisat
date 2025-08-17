@@ -30,9 +30,6 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include "minisat/minisatup.h"
 
-#include <vector>
-#include <queue>
-
 
 namespace Minisat {
 
@@ -198,8 +195,6 @@ protected:
     vec<CRef>           learnts;          // List of learnt clauses.
     vec<Lit>            trail;            // Assignment stack; stores all assigments made in the order they were made.
     vec<int>            trail_lim;        // Separator indices for different decision levels in 'trail'.
-    vec<vec<Lit>>       trail_level;
-    std::priority_queue<std::pair<int, Var>, std::vector<std::pair<int, Var>>, std::greater<std::pair<int, Var>>> propagation_queue;
     vec<Lit>            assumptions;      // Current set of assumptions provided to solve by the user.
 
     VMap<double>        activity;         // A heuristic measurement of the activity of a variable.
@@ -216,6 +211,7 @@ protected:
     bool                ok;               // If FALSE, the constraints are already unsatisfiable. No part of the solver state may be used!
     double              cla_inc;          // Amount to bump next clause with.
     double              var_inc;          // Amount to bump next variable with.
+    int                 qhead;            // Head of queue (as index into the trail -- no more explicit propagation queue in MiniSat).
     int                 simpDB_assigns;   // Number of top-level assignments since last execution of 'simplify()'.
     int64_t             simpDB_props;     // Remaining number of propagations that must be made before next execution of 'simplify()'.
     double              progress_estimate;// Set by 'search()'.
@@ -501,7 +497,6 @@ inline bool     Solver::isRemoved       (CRef cr)         const { return ca[cr].
 inline bool     Solver::locked          (const Clause& c) const { return value(c[0]) == l_True && reason(var(c[0])) != CRef_Undef && !isReasonLazy(var(c[0])) && ca.lea(reason(var(c[0]))) == &c; }
 inline void     Solver::newDecisionLevel()                      {
     trail_lim.push(trail.size());
-    trail_level.push();
     if (external_propagator) {
         assert(notify_backtrack == false);
         assert(notify_assignment_index == trail.size());
