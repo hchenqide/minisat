@@ -280,16 +280,27 @@ bool Solver::satisfied(const Clause& c) const {
 //
 void Solver::cancelUntil(int l) {
     if (decisionLevel() > l){
+        for (int i = trail.size() - 1; i >= trail_lim[l]; --i) {
+            Var x = var(trail[i]);
+            if (seen[x]) {
+                trail[i] = lit_Undef;
+            } else {
+                seen[x] = true;
+            }
+        }
+
         int i, j;
         for (i = j = trail_lim[l]; i < trail.size(); ++i) {
             if (qhead == i) {
                 qhead = j;
             }
 
-            Var x = var(trail[i]);
-            if (assigns[x] == l_Undef) {
+            if (trail[i] == lit_Undef) {
                 continue;
             }
+
+            Var x = var(trail[i]);
+            seen[x] = false;
 
             if (level(x) <= l) {
                 trail[j++] = trail[i];
