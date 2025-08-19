@@ -698,7 +698,7 @@ void Solver::reassign_negation(Lit p, CRef c, int l)
 {
     assert(value(p) == l_False);
     assert(level(p) > l);
-    cancelUntil(l);
+    cancelUntil(level(p) - 1);
     assign(p, c, l);
 }
 
@@ -1314,6 +1314,10 @@ void Solver::relocAll(ClauseAllocator& to)
     //
     for (int i = 0; i < trail.size(); i++){
         Var v = var(trail[i]);
+        if (seen[v]) {
+            continue;
+        }
+        seen[v] = true;
 
         // Note: it is not safe to call 'locked()' on a relocated clause. This is why we keep
         // 'dangling' reasons here. It is safe and does not hurt.
@@ -1321,6 +1325,10 @@ void Solver::relocAll(ClauseAllocator& to)
             assert(!isRemoved(reason(v)));
             ca.reloc(vardata[v].reason, to);
         }
+    }
+    for (int i = 0; i < trail.size(); i++){
+        Var v = var(trail[i]);
+        seen[v] = false;
     }
 
     // All learnt:
