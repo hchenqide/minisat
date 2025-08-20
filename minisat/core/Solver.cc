@@ -697,7 +697,9 @@ void Solver::reassign(Lit p, CRef c, int l)
 {
     assert(value(p) == l_True);
     assert(level(p) > l);
-    assert(vardata_lazy[var(p)].level == -1 || vardata_lazy[var(p)].level > l);
+    if (vardata_lazy[var(p)].level != -1 && vardata_lazy[var(p)].level <= l) {
+        return;
+    }
     vardata_lazy[var(p)] = mkVarData(c, l);
 }
 
