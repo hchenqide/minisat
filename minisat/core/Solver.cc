@@ -423,7 +423,9 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         pathC--;
         if (vardata_lazy[var(p)].level != -1 && vardata_lazy[var(p)].level < analyze_level) {
             if (confl == CRef_Undef) {
-                assert(vardata_lazy[var(p)].level == 0);
+                // p is decision: pathC == 0, skip analysis
+                //   or
+                // p is external propagation with actual level 0
             } else {
                 assert(vardata_lazy[var(p)].level > 0);
                 seen[var(p)] = 1;
