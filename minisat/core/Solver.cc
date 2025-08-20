@@ -421,7 +421,14 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         confl = reasonLazy(var(p));
         seen[var(p)] = 0;
         pathC--;
-        if (confl == CRef_Undef) {
+        if (vardata_lazy[var(p)].level != -1 && vardata_lazy[var(p)].level < analyze_level) {
+            if (confl == CRef_Undef) {
+                assert(vardata_lazy[var(p)].level == 0);
+            } else {
+                assert(vardata_lazy[var(p)].level > 0);
+                seen[var(p)] = 1;
+                out_learnt.push(~p);
+            }
             if (pathC > 0) {
                 goto SelectNext;
             } else {
@@ -449,6 +456,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
             else{
                 CRef cr = reasonLazy(var(out_learnt[i]));
                 if (cr == CRef_Undef) {
+                    assert(vardata_lazy[var(out_learnt[i])].level == 0);
                     continue;
                 }
                 Clause& c = ca[cr];
@@ -480,6 +488,7 @@ bool Solver::litRedundant(Lit p)
 
     CRef cr = reasonLazy(var(p));
     if (cr == CRef_Undef) {
+        assert(vardata_lazy[var(p)].level == 0);
         return true;
     }
 
@@ -510,6 +519,7 @@ bool Solver::litRedundant(Lit p)
 
             cr = reasonLazy(var(p));
             if (cr == CRef_Undef) {
+                assert(vardata_lazy[var(p)].level == 0);
                 continue;
             }
 
@@ -568,6 +578,7 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
             }else{
                 CRef ref = reasonLazy(x);
                 if (ref == CRef_Undef) {
+                    assert(vardata_lazy[x].level == 0);
                     seen[x] = 0;
                     continue;
                 }
