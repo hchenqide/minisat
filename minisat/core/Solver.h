@@ -286,7 +286,6 @@ protected:
     int      decisionLevel    ()      const; // Gives the current decisionlevel.
     uint32_t abstractLevel    (Var x) const; // Used to represent an abstraction of sets of decision levels.
     CRef     reason           (Var x) const;
-    bool     isReasonLazy     (Var x) const;
     CRef     reasonLazy       (Var x);
     int      level            (Var x) const;
     int      level            (Lit l) const;
@@ -451,7 +450,6 @@ public:
 // Implementation of inline methods:
 
 inline CRef Solver::reason(Var x) const { return vardata[x].reason; }
-inline bool Solver::isReasonLazy(Var x) const { return reason(x) == CRef_External; }
 
 inline int  Solver::level (Var x) const { assert(value(x) != l_Undef); return vardata[x].level; }
 inline int  Solver::level (Lit l) const { return level(var(l)); }
@@ -495,7 +493,7 @@ inline bool     Solver::addClause       (Lit p, Lit q, Lit r)   { add_tmp.clear(
 inline bool     Solver::addClause       (Lit p, Lit q, Lit r, Lit s){ add_tmp.clear(); add_tmp.push(p); add_tmp.push(q); add_tmp.push(r); add_tmp.push(s); return addClause_(add_tmp); }
 
 inline bool     Solver::isRemoved       (CRef cr)         const { return ca[cr].mark() == 1; }
-inline bool     Solver::locked          (const Clause& c) const { return value(c[0]) == l_True && reason(var(c[0])) != CRef_Undef && !isReasonLazy(var(c[0])) && ca.lea(reason(var(c[0]))) == &c; }
+inline bool     Solver::locked          (const Clause& c) const { return value(c[0]) == l_True && ((reason(var(c[0])) != CRef_Undef && reason(var(c[0])) != CRef_External && ca.lea(reason(var(c[0]))) == &c) || (vardata_lazy[var(c[0])].reason != CRef_Undef && ca.lea(vardata_lazy[var(c[0])].reason) == &c)); }
 inline void     Solver::newDecisionLevel()                      {
     trail_lim.push(trail.size());
     if (external_propagator) {

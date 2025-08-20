@@ -34,6 +34,7 @@ void print_vec_lit(const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) print
 void print_vec_var(const vec<Var>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(mkLit(v[i]))); printf("\n"); }
 // void print_vec_watch(const vec<Minisat::Solver::Watcher>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", v[i].cref); printf("\n"); }
 void print_clause(const Clause& c) { for (int i = 0; i < c.size(); i++) printf("%d ", LitToint(c[i])); printf("\n"); }
+// void print_clause_detail(Solver& solver, const Clause& c) { for (int i = 0; i < c.size(); i++) { printf("%d:%c", LitToint(c[i]), solver.value(c[i]) == l_True ? 'T' : solver.value(c[i]) == l_False? 'F' : 'U'); solver.value(c[i]) == l_Undef ? int() : printf("%d-%d", solver.level(c[i]), solver.reason(var(c[i]))); solver.vardata_lazy[var(c[i])].level == -1? int() : printf("(%d-%d)", solver.vardata_lazy[var(c[i])].level, solver.vardata_lazy[var(c[i])].reason); printf(" "); } printf("\n"); }
 
 
 //=================================================================================================
@@ -415,8 +416,8 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         }
 
     SelectNext:
-        assert(index >= 0);
-        while (!seen[var(trail[index])] || level(trail[index]) < analyze_level) { index--; assert(index >= 0); }
+        assert(index >= trail_lim[analyze_level - 1]);
+        while (!seen[var(trail[index])] || level(trail[index]) < analyze_level) { index--; assert(index >= trail_lim[analyze_level - 1]); }
         p = trail[index--];
         confl = reasonLazy(var(p));
         seen[var(p)] = 0;
@@ -1342,9 +1343,15 @@ void Solver::relocAll(ClauseAllocator& to)
 
         // Note: it is not safe to call 'locked()' on a relocated clause. This is why we keep
         // 'dangling' reasons here. It is safe and does not hurt.
-        if (reason(v) != CRef_Undef && !isReasonLazy(v) && (ca[reason(v)].reloced() || locked(ca[reason(v)]))){
+        if (reason(v) != CRef_Undef && reason(v) != CRef_External){
+            assert(ca[reason(v)].reloced());
             assert(!isRemoved(reason(v)));
             ca.reloc(vardata[v].reason, to);
+        }
+
+        if (vardata_lazy[v].level != -1 && vardata_lazy[v].reason != CRef_Undef) {
+            assert(!isRemoved(vardata_lazy[v].reason));
+            ca.reloc(vardata_lazy[v].reason, to);
         }
     }
 
@@ -1569,7 +1576,7 @@ void Solver::external_get_reason(Lit lit, vec<Lit>& ps) {
 
 CRef Solver::reasonLazy(Var x) {
     if (external_propagator) {
-        if (isReasonLazy(x)) {
+        if (reason(x) == CRef_External) {
             assert(assigns[x] != l_Undef);
             Lit l = mkLit(x, assigns[x] == l_False);
             external_get_reason(l, add_tmp);
