@@ -426,16 +426,12 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
                 // p is decision: pathC == 0, skip analysis
                 //   or
                 // p is external propagation with actual level 0
-            } else {
-                assert(vardata_lazy[var(p)].level > 0);
-                seen[var(p)] = 1;
-                out_learnt.push(~p);
-            }
-            if (pathC > 0) {
-                goto SelectNext;
-            } else {
-                for (int j = 1; j < out_learnt.size(); j++) seen[var(out_learnt[j])] = 0;
-                return false;
+                if (pathC > 0) {
+                    goto SelectNext;
+                } else {
+                    for (int j = 1; j < out_learnt.size(); j++) seen[var(out_learnt[j])] = 0;
+                    return false;
+                }
             }
         }
     }while (pathC > 0);
