@@ -34,7 +34,7 @@ void print_vec_lit(const vec<Lit>& v) { for (int i = 0; i < v.size(); i++) print
 void print_vec_var(const vec<Var>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", LitToint(mkLit(v[i]))); printf("\n"); }
 // void print_vec_watch(const vec<Minisat::Solver::Watcher>& v) { for (int i = 0; i < v.size(); i++) printf("%d ", v[i].cref); printf("\n"); }
 void print_clause(const Clause& c) { for (int i = 0; i < c.size(); i++) printf("%d ", LitToint(c[i])); printf("\n"); }
-// void print_clause_detail(Solver& solver, const Clause& c) { for (int i = 0; i < c.size(); i++) { printf("%d:%c", LitToint(c[i]), solver.value(c[i]) == l_True ? 'T' : solver.value(c[i]) == l_False? 'F' : 'U'); solver.value(c[i]) == l_Undef ? int() : printf("%d-%d", solver.level(c[i]), solver.reason(var(c[i]))); solver.vardata_lazy[var(c[i])].level == -1? int() : printf("(%d-%d)", solver.vardata_lazy[var(c[i])].level, solver.vardata_lazy[var(c[i])].reason); printf(" "); } printf("\n"); }
+// void print_clause_detail(Solver& solver, const Clause& c) { for (int i = 0; i < c.size(); i++) { printf("%d:%c", LitToint(c[i]), solver.value(c[i]) == l_True ? 'T' : solver.value(c[i]) == l_False? 'F' : 'U'); solver.value(c[i]) == l_Undef ? int() : printf("%d-%d", solver.level(c[i]), solver.reason(var(c[i]))); solver.levelLazy(c[i]) == -1? int() : printf("(%d)", solver.levelLazy(c[i])); printf(" "); } printf("\n"); }
 
 
 //=================================================================================================
@@ -139,7 +139,7 @@ Var Solver::newVar(lbool upol, bool dvar)
     watches  .init(mkLit(v, true ));
     assigns  .insert(v, l_Undef);
     vardata  .insert(v, mkVarData(CRef_Undef, 0));
-    vardata_lazy.insert(v, mkVarData(CRef_Undef, -1));
+    vardata_lazy.insert(v, -1);
     activity .insert(v, rnd_init_act ? drand(random_seed) * 0.00001 : 0);
     seen     .insert(v, 0);
     seen_add .insert(v, 0);
@@ -290,14 +290,14 @@ void Solver::cancelUntil(int l) {
             if (level(x) <= l) {
                 trail[j++] = trail[i];
             } else{
-                if (vardata_lazy[x].level != -1) {
-                    if (vardata_lazy[x].level <= l) {
+                if (levelLazy(x) != -1) {
+                    if (levelLazy(x) <= l) {
                         trail.push(trail[i]);
-                        vardata[x] = vardata_lazy[x];
-                        vardata_lazy[x] = mkVarData(CRef_Undef, -1);
+                        vardata[x].level = levelLazy(x);
+                        vardata_lazy[x] = -1;
                         continue;
                     } else {
-                        vardata_lazy[x] = mkVarData(CRef_Undef, -1);
+                        vardata_lazy[x] = -1;
                     }
                 }
 
@@ -422,7 +422,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         confl = reasonLazy(var(p));
         seen[var(p)] = 0;
         pathC--;
-        if (vardata_lazy[var(p)].level != -1 && vardata_lazy[var(p)].level < analyze_level) {
+        if (levelLazy(p) != -1 && levelLazy(p) < analyze_level) {
             if (confl == CRef_Undef) {
                 // p is decision: pathC == 0, skip analysis
                 //   or
@@ -455,7 +455,7 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
             else{
                 CRef cr = reasonLazy(var(out_learnt[i]));
                 if (cr == CRef_Undef) {
-                    assert(vardata_lazy[var(out_learnt[i])].level == 0);
+                    assert(levelLazy(out_learnt[i]) == 0);
                     continue;
                 }
                 Clause& c = ca[cr];
@@ -487,7 +487,7 @@ bool Solver::litRedundant(Lit p)
 
     CRef cr = reasonLazy(var(p));
     if (cr == CRef_Undef) {
-        assert(vardata_lazy[var(p)].level == 0);
+        assert(levelLazy(p) == 0);
         return true;
     }
 
@@ -518,7 +518,7 @@ bool Solver::litRedundant(Lit p)
 
             cr = reasonLazy(var(p));
             if (cr == CRef_Undef) {
-                assert(vardata_lazy[var(p)].level == 0);
+                assert(levelLazy(p) == 0);
                 continue;
             }
 
@@ -577,7 +577,7 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict)
             }else{
                 CRef ref = reasonLazy(x);
                 if (ref == CRef_Undef) {
-                    assert(vardata_lazy[x].level == 0);
+                    assert(levelLazy(x) == 0);
                     seen[x] = 0;
                     continue;
                 }
@@ -694,10 +694,11 @@ void Solver::reassign(Lit p, CRef c, int l)
 {
     assert(value(p) == l_True);
     assert(level(p) > l);
-    if (vardata_lazy[var(p)].level != -1 && vardata_lazy[var(p)].level <= l) {
+    if (levelLazy(p) != -1 && levelLazy(p) <= l) {
         return;
     }
-    vardata_lazy[var(p)] = mkVarData(c, l);
+    vardata[var(p)].reason = c;
+    vardata_lazy[var(p)] = l;
 }
 
 void Solver::reassign_negation(Lit p, CRef c, int l)
@@ -705,8 +706,8 @@ void Solver::reassign_negation(Lit p, CRef c, int l)
     assert(value(p) == l_False);
     assert(level(p) > l);
 
-    if (vardata_lazy[var(p)].level != -1) {
-        if (vardata_lazy[var(p)].level <= l) {
+    if (levelLazy(p) != -1) {
+        if (levelLazy(p) <= l) {
             // conflict or propagation (false, false)
             // resolved during propagation of p, or unsat
             // backtrack to any level in [l, level(p) - 1]
@@ -717,8 +718,8 @@ void Solver::reassign_negation(Lit p, CRef c, int l)
             cancelUntil(rand() % (level(p) - l) + l);
             return;
         } else {
-            // backtrack to any level in [l, vardata_lazy[var(p)].level - 1]
-            cancelUntil(rand() % (vardata_lazy[var(p)].level - l) + l);
+            // backtrack to any level in [l, levelLazy(p) - 1]
+            cancelUntil(rand() % (levelLazy(p) - l) + l);
         }
     } else {
         // backtrack to any level in [l, level(p) - 1]
@@ -1348,11 +1349,6 @@ void Solver::relocAll(ClauseAllocator& to)
             assert(!isRemoved(reason(v)));
             ca.reloc(vardata[v].reason, to);
         }
-
-        if (vardata_lazy[v].level != -1 && vardata_lazy[v].reason != CRef_Undef) {
-            assert(!isRemoved(vardata_lazy[v].reason));
-            ca.reloc(vardata_lazy[v].reason, to);
-        }
     }
 
     // All learnt:
@@ -1578,15 +1574,16 @@ CRef Solver::reasonLazy(Var x) {
     if (external_propagator) {
         if (reason(x) == CRef_External) {
             assert(assigns[x] != l_Undef);
+            assert(levelLazy(x) == -1);
             Lit l = mkLit(x, assigns[x] == l_False);
             external_get_reason(l, add_tmp);
-            vardata[x].reason = add_clause_lazy(l, add_tmp);
+            add_clause_lazy(l, add_tmp);
         }
     }
     return vardata[x].reason;
 }
 
-CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
+void Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
     assert(ps.size() >= 1);
 
     Lit a = ps[0];
@@ -1596,7 +1593,7 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
         assert(a == lit);
         assert(value(a) == l_True);
         reassign(a, CRef_Undef, 0);
-        return CRef_Undef;
+        return;
     }
 
     // proof keep original clause for output
@@ -1653,7 +1650,7 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
 
     if (ps.size() == 1) {
         reassign(a, CRef_Undef, 0);
-        return CRef_Undef;
+        return;
     }
 
     assert(i_max >= 1);
@@ -1671,10 +1668,10 @@ CRef Solver::add_clause_lazy(Lit lit, vec<Lit>& ps) {
 
     if (level(a) > level_max) {
         reassign(a, cr, level_max);
-        return cr;
+        return;
     }
 
-    return cr;
+    vardata[var(lit)].reason = cr;
 }
 
 void Solver::connect_external_propagator(MiniSatUP::ExternalPropagator *external_propagator) {

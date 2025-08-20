@@ -203,7 +203,7 @@ protected:
     VMap<lbool>         user_pol;         // The users preferred polarity of each variable.
     VMap<char>          decision;         // Declares if a variable is eligible for selection in the decision heuristic.
     VMap<VarData>       vardata;          // Stores reason and level for each variable.
-    VMap<VarData>       vardata_lazy;
+    VMap<int>           vardata_lazy;
     OccLists<Lit, vec<Watcher>, WatcherDeleted, MkIndexLit>
                         watches;          // 'watches[lit]' is a list of constraints watching 'lit' (will go there if literal becomes true).
 
@@ -289,6 +289,8 @@ protected:
     CRef     reasonLazy       (Var x);
     int      level            (Var x) const;
     int      level            (Lit l) const;
+    int      levelLazy        (Var x) const;
+    int      levelLazy        (Lit l) const;
     double   progressEstimate ()      const; // DELETE THIS ?? IT'S NOT VERY USEFUL ...
     bool     withinBudget     ()      const;
     void     relocAll         (ClauseAllocator& to);
@@ -364,7 +366,7 @@ private:
     void external_get_reason(Lit lit, vec<Lit>& ps);
 private:
     void add_clause_solving(vec<Lit>& ps, bool forgettable);
-    CRef add_clause_lazy(Lit lit, vec<Lit>& ps);
+    void add_clause_lazy(Lit lit, vec<Lit>& ps);
 
 public:
     // Add call-back which allows to learn, propagate and backtrack based on
@@ -453,6 +455,8 @@ inline CRef Solver::reason(Var x) const { return vardata[x].reason; }
 
 inline int  Solver::level (Var x) const { assert(value(x) != l_Undef); return vardata[x].level; }
 inline int  Solver::level (Lit l) const { return level(var(l)); }
+inline int  Solver::levelLazy(Var x) const { assert(value(x) != l_Undef); return vardata_lazy[x]; }
+inline int  Solver::levelLazy(Lit l) const { return levelLazy(var(l)); }
 
 inline void Solver::insertVarOrder(Var x) {
     if (!order_heap.inHeap(x) && decision[x]) order_heap.insert(x); }
@@ -493,7 +497,7 @@ inline bool     Solver::addClause       (Lit p, Lit q, Lit r)   { add_tmp.clear(
 inline bool     Solver::addClause       (Lit p, Lit q, Lit r, Lit s){ add_tmp.clear(); add_tmp.push(p); add_tmp.push(q); add_tmp.push(r); add_tmp.push(s); return addClause_(add_tmp); }
 
 inline bool     Solver::isRemoved       (CRef cr)         const { return ca[cr].mark() == 1; }
-inline bool     Solver::locked          (const Clause& c) const { return value(c[0]) == l_True && ((reason(var(c[0])) != CRef_Undef && reason(var(c[0])) != CRef_External && ca.lea(reason(var(c[0]))) == &c) || (vardata_lazy[var(c[0])].reason != CRef_Undef && ca.lea(vardata_lazy[var(c[0])].reason) == &c)); }
+inline bool     Solver::locked          (const Clause& c) const { return value(c[0]) == l_True && reason(var(c[0])) != CRef_Undef && reason(var(c[0])) != CRef_External && ca.lea(reason(var(c[0]))) == &c; }
 inline void     Solver::newDecisionLevel()                      {
     trail_lim.push(trail.size());
     if (external_propagator) {
