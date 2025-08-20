@@ -693,6 +693,9 @@ void Solver::reassign_negation(Lit p, CRef c, int l)
     assert(value(p) == l_False);
     assert(level(p) > l);
     cancelUntil(level(p) - 1);
+    if (value(p) == l_False) {
+        return;
+    }
     assign(p, c, l);
 }
 
