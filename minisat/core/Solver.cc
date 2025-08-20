@@ -703,10 +703,27 @@ void Solver::reassign_negation(Lit p, CRef c, int l)
 {
     assert(value(p) == l_False);
     assert(level(p) > l);
-    cancelUntil(level(p) - 1);
-    if (value(p) == l_False) {
-        return;
+
+    if (vardata_lazy[var(p)].level != -1) {
+        if (vardata_lazy[var(p)].level <= l) {
+            // conflict or propagation (false, false)
+            // resolved during propagation of p, or unsat
+            // backtrack to any level in [l, level(p) - 1]
+            if (c == CRef_Undef) {
+                assert(l == 0);
+                throw exception_unsat();
+            }
+            cancelUntil(rand() % (level(p) - l) + l);
+            return;
+        } else {
+            // backtrack to any level in [l, vardata_lazy[var(p)].level - 1]
+            cancelUntil(rand() % (vardata_lazy[var(p)].level - l) + l);
+        }
+    } else {
+        // backtrack to any level in [l, level(p) - 1]
+        cancelUntil(rand() % (level(p) - l) + l);
     }
+
     assign(p, c, l);
 }
 
