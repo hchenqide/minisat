@@ -203,6 +203,7 @@ protected:
     VMap<lbool>         user_pol;         // The users preferred polarity of each variable.
     VMap<char>          decision;         // Declares if a variable is eligible for selection in the decision heuristic.
     VMap<VarData>       vardata;          // Stores reason and level for each variable.
+    VMap<VarData>       vardata_lazy;
     OccLists<Lit, vec<Watcher>, WatcherDeleted, MkIndexLit>
                         watches;          // 'watches[lit]' is a list of constraints watching 'lit' (will go there if literal becomes true).
 
@@ -364,7 +365,7 @@ private:
     void external_get_reason(Lit lit, vec<Lit>& ps);
 private:
     void add_clause_solving(vec<Lit>& ps, bool forgettable);
-    void add_clause_lazy(Lit lit, vec<Lit>& ps);
+    CRef add_clause_lazy(Lit lit, vec<Lit>& ps);
 
 public:
     // Add call-back which allows to learn, propagate and backtrack based on
