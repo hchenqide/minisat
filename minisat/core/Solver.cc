@@ -679,6 +679,7 @@ void Solver::assign(Lit p, CRef c, int l)
     assigns[var(p)] = lbool(!sign(p));
     trail.push(p);
 
+    assert(l != 0 || c == CRef_Undef);
     vardata[var(p)] = mkVarData(c, l);
 
     if (l == 0 && fixed_listener && decisionLevel() == 0) {
@@ -699,6 +700,8 @@ void Solver::reassign(Lit p, CRef c, int l)
     if (levelLazy(p) != -1 && levelLazy(p) <= l) {
         return;
     }
+
+    assert(l != 0 || c == CRef_Undef);
     vardata[var(p)].reason = c;
     vardata_lazy[var(p)] = l;
 }
@@ -799,14 +802,30 @@ void Solver::propagate()
                 *j++ = w;
             }
 
+            if (level_max == 0) {
+                if (value(first) == l_False) {
+                    if (level(first) > level_max) {
+                        reassign_negation(first, CRef_Undef, 0);
+                    } else {
+                        throw exception_unsat();
+                    }
+                } else if (value(first) == l_True) {
+                    if (level(first) > level_max) {
+                        reassign(first, CRef_Undef, 0);
+                    } else {
+                        continue;
+                    }
+                } else {
+                    assert(value(first) == l_Undef);
+                    assign(first, CRef_Undef, 0);
+                }
+                continue;
+            }
+
             if (value(first) == l_False) {
                 if (level(first) > level_max) {
                     reassign_negation(first, cr, level_max);
                 } else if (level(first) == level_max) {
-                    if (level_max == 0) {
-                        throw exception_unsat();
-                    }
-
                     Watcher* ws_old = ws.get();
 
                     analyzeAndLearn(cr, level_max);
