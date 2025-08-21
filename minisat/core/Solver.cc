@@ -138,8 +138,7 @@ Var Solver::newVar(lbool upol, bool dvar)
     watches  .init(mkLit(v, false));
     watches  .init(mkLit(v, true ));
     assigns  .insert(v, l_Undef);
-    vardata  .insert(v, mkVarData(CRef_Undef, 0));
-    vardata_lazy.insert(v, -1);
+    vardata  .insert(v, mkVarData(CRef_Undef, 0, -1));
     activity .insert(v, rnd_init_act ? drand(random_seed) * 0.00001 : 0);
     seen     .insert(v, 0);
     seen_add .insert(v, 0);
@@ -294,10 +293,10 @@ void Solver::cancelUntil(int l) {
                     if (levelLazy(x) <= l) {
                         trail.push(trail[i]);
                         vardata[x].level = levelLazy(x);
-                        vardata_lazy[x] = -1;
+                        vardata[x].level_lazy = -1;
                         continue;
                     } else {
-                        vardata_lazy[x] = -1;
+                        vardata[x].level_lazy = -1;
                     }
                 }
 
@@ -669,7 +668,7 @@ void Solver::uncheckedEnqueue(Lit p, CRef from)
 
     assert(value(p) == l_Undef);
     assigns[var(p)] = lbool(!sign(p));
-    vardata[var(p)] = mkVarData(from, decisionLevel());
+    vardata[var(p)] = mkVarData(from, decisionLevel(), -1);
     trail.push_(p);
 }
 
@@ -680,7 +679,7 @@ void Solver::assign(Lit p, CRef c, int l)
     trail.push(p);
 
     assert(l != 0 || c == CRef_Undef);
-    vardata[var(p)] = mkVarData(c, l);
+    vardata[var(p)] = mkVarData(c, l, -1);
 
     if (l == 0 && fixed_listener && decisionLevel() == 0) {
         if (external_propagator && notify_backtrack) {
@@ -703,7 +702,7 @@ void Solver::reassign(Lit p, CRef c, int l)
 
     assert(l != 0 || c == CRef_Undef);
     vardata[var(p)].reason = c;
-    vardata_lazy[var(p)] = l;
+    vardata[var(p)].level_lazy = l;
 }
 
 void Solver::reassign_negation(Lit p, CRef c, int l)

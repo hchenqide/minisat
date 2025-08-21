@@ -157,8 +157,8 @@ protected:
 
     // Helper structures:
     //
-    struct VarData { CRef reason; int level; };
-    static inline VarData mkVarData(CRef cr, int l){ VarData d = {cr, l}; return d; }
+    struct VarData { CRef reason; int level; int level_lazy; };
+    static inline VarData mkVarData(CRef cr, int l, int ll){ VarData d = {cr, l, ll}; return d; }
 
     struct Watcher {
         CRef cref;
@@ -203,7 +203,6 @@ protected:
     VMap<lbool>         user_pol;         // The users preferred polarity of each variable.
     VMap<char>          decision;         // Declares if a variable is eligible for selection in the decision heuristic.
     VMap<VarData>       vardata;          // Stores reason and level for each variable.
-    VMap<int>           vardata_lazy;
     OccLists<Lit, vec<Watcher>, WatcherDeleted, MkIndexLit>
                         watches;          // 'watches[lit]' is a list of constraints watching 'lit' (will go there if literal becomes true).
 
@@ -455,7 +454,7 @@ inline CRef Solver::reason(Var x) const { return vardata[x].reason; }
 
 inline int  Solver::level (Var x) const { assert(value(x) != l_Undef); return vardata[x].level; }
 inline int  Solver::level (Lit l) const { return level(var(l)); }
-inline int  Solver::levelLazy(Var x) const { assert(value(x) != l_Undef); return vardata_lazy[x]; }
+inline int  Solver::levelLazy(Var x) const { assert(value(x) != l_Undef); return vardata[x].level_lazy; }
 inline int  Solver::levelLazy(Lit l) const { return levelLazy(var(l)); }
 
 inline void Solver::insertVarOrder(Var x) {
