@@ -815,13 +815,12 @@ void Solver::propagate()
                     j = ws_new + (j - ws_old);
                     end = ws_new + ws.size();
 
-                    if (level_max == l) {
+                    if (level_max == l || decisionLevel() < l) {
                         // Copy the remaining watches (not copied when UNSAT thrown).
                         while (i < end) *j++ = *i++;
                         ws.shrink(i - j);
                         goto NextVariable;
                     } else {
-                        assert(decisionLevel() >= l);
                         continue;
                     }
                 } else {
