@@ -424,15 +424,17 @@ bool Solver::analyze(CRef confl, int analyze_level, vec<Lit>& out_learnt)
         pathC--;
         if (levelLazy(p) != -1 && levelLazy(p) < analyze_level) {
             if (confl == CRef_Undef) {
-                // p is decision: pathC == 0, skip analysis
-                //   or
-                // p is external propagation with actual level 0
-                if (pathC > 0) {
-                    goto SelectNext;
-                } else {
-                    for (int j = 1; j < out_learnt.size(); j++) seen[var(out_learnt[j])] = 0;
-                    return false;
-                }
+                assert(levelLazy(p) == 0);
+            } else {
+                assert(levelLazy(p) > 0);
+                seen[var(p)] = 1;
+                out_learnt.push(~p);
+            }
+            if (pathC > 0) {
+                goto SelectNext;
+            } else {
+                for (int j = 1; j < out_learnt.size(); j++) seen[var(out_learnt[j])] = 0;
+                return false;
             }
         }
     }while (pathC > 0);
@@ -608,7 +610,7 @@ void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
 
     assert(learnt_clause.size() > 0);
     assert(value(learnt_clause[0]) == l_False && level(learnt_clause[0]) == analyze_level);
-    assert([&]() { for (int i = 1; i < learnt_clause.size(); i++) { assert(value(learnt_clause[i]) == l_False && level(learnt_clause[i]) < analyze_level && level(learnt_clause[i]) > 0); } return true; }());
+    assert([&]() { for (int i = 1; i < learnt_clause.size(); i++) { Lit p = learnt_clause[i]; assert(value(p) == l_False && ((level(p) < analyze_level && level(p) > 0) || (level(p) == analyze_level && levelLazy(p) != -1 && levelLazy(p) < analyze_level && levelLazy(p) > 0))); } return true; }());
 
     // proof print learned clause
     if (output) {
@@ -627,9 +629,9 @@ void Solver::analyzeAndLearn(CRef confl, int analyze_level) {
     } else {
         Lit p = learnt_clause[1];
         int max_i = 1;
-        int max_level = level(p);
+        int max_level = level(p) < analyze_level ? level(p) : levelLazy(p);
         for (int i = 2; i < learnt_clause.size(); i++) {
-            int curr_level = level(learnt_clause[i]);
+            int curr_level = level(learnt_clause[i]) < analyze_level ? level(learnt_clause[i]) : levelLazy(learnt_clause[i]);
             if (curr_level > max_level) {
                 max_level = curr_level;
                 max_i = i;
